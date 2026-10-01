@@ -6,6 +6,8 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- The editor is published to GitHub Pages on each release.
+
 ## 0.1.0
 
 First public version.

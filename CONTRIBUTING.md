@@ -69,4 +69,5 @@ diff before committing them.
 1. Move the "Unreleased" entries in CHANGELOG.md under the new version.
 2. Bump `version` in package.json.
 3. Tag `vX.Y.Z` and push the tag. The release workflow builds and attaches
-   `estorm.html`.
+   `estorm.html`, and the Pages workflow publishes it to
+   <https://ville6000.github.io/estorm/>.

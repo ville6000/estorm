@@ -50,6 +50,9 @@ open it. It is a single self-contained file that works offline: edit on the
 left, see the board on the right, click a sticky to jump to its line, open
 and save `.estorm` files, and export SVG.
 
+It is also hosted at <https://ville6000.github.io/estorm/>, updated on
+each release.
+
 To share it with your teams, put the file on any static web server, an
 intranet page or a file share.
 
