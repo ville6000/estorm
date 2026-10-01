@@ -2,11 +2,23 @@
  * The estorm editor: edit a board on the left, see it on the right. Runs
  * entirely in the browser; the build inlines everything into one HTML file.
  */
-import { Compartment, EditorState, RangeSet, StateEffect, StateField } from '@codemirror/state';
-import { drawSelection, EditorView, GutterMarker, keymap, lineNumberMarkers, lineNumbers } from '@codemirror/view';
+import { Compartment, EditorState, RangeSet, RangeSetBuilder, StateEffect, StateField } from '@codemirror/state';
+import {
+  Decoration,
+  type DecorationSet,
+  drawSelection,
+  EditorView,
+  GutterMarker,
+  keymap,
+  lineNumberMarkers,
+  lineNumbers,
+  ViewPlugin,
+  type ViewUpdate,
+} from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, insertNewlineKeepIndent } from '@codemirror/commands';
 import { vim, Vim } from '@replit/codemirror-vim';
 import { layout, parse, ParseError, svg } from '../src/index.ts';
+import { tokenize } from './highlight.ts';
 
 // File System Access API: Chromium only, so feature-detected.
 interface FileHandle {
@@ -137,6 +149,49 @@ const errorLineField = StateField.define<RangeSet<GutterMarker>>({
   provide: (f) => lineNumberMarkers.from(f),
 });
 
+/** The name of the event under the cursor, if any. */
+function eventAtCursor(state: EditorState): string | null {
+  const head = state.selection.main.head;
+  const line = state.doc.lineAt(head);
+  const at = head - line.from;
+  const t = tokenize(line.text).find((t) => t.kind === 'event' && t.from <= at && at <= t.to);
+  return t ? line.text.slice(t.from, t.to) : null;
+}
+
+/**
+ * Colours each token like the sticky it becomes (see highlight.ts), and marks
+ * every mention of the event under the cursor.
+ */
+function highlightLines(view: EditorView): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>();
+  const current = eventAtCursor(view.state);
+  for (const { from, to } of view.visibleRanges) {
+    for (let pos = from; pos <= to; ) {
+      const line = view.state.doc.lineAt(pos);
+      for (const t of tokenize(line.text)) {
+        const match = t.kind === 'event' && line.text.slice(t.from, t.to) === current;
+        const cls = match ? 'tok-event tok-match' : `tok-${t.kind}`;
+        builder.add(line.from + t.from, line.from + t.to, Decoration.mark({ class: cls }));
+      }
+      pos = line.to + 1;
+    }
+  }
+  return builder.finish();
+}
+
+const highlighter = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = highlightLines(view);
+    }
+    update(u: ViewUpdate) {
+      if (u.docChanged || u.viewportChanged || u.selectionSet) this.decorations = highlightLines(u.view);
+    }
+  },
+  { decorations: (p) => p.decorations },
+);
+
 // Vim must come first so its keys win over the default keymap.
 const vimMode = new Compartment();
 
@@ -147,6 +202,7 @@ function createState(text: string): EditorState {
       vimMode.of(state.vim ? vim({ status: true }) : []),
       lineNumbers(),
       errorLineField,
+      highlighter,
       history(),
       drawSelection(),
       EditorState.tabSize.of(2),

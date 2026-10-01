@@ -9,6 +9,8 @@ project follows [Semantic Versioning](https://semver.org/).
 - The editor is published to GitHub Pages on each release.
 - The editor uses CodeMirror and has optional vim keybindings (toggle with
   the Vim button; `:w` saves).
+- Syntax highlighting in the editor. Putting the cursor on an event marks
+  every mention of it.
 
 ## 0.1.0
 
