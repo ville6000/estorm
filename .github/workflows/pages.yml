@@ -1,15 +1,15 @@
 name: Pages
 
-# Publishes the browser editor to GitHub Pages on each release tag, so the
-# hosted version always matches the latest release. Run it by hand on a tag
-# ("Run workflow", pick the tag) to republish an existing release.
+# Publishes the browser editor to GitHub Pages. The release workflow calls
+# this once a release succeeds, so the hosted version always matches the
+# latest release. Run it by hand on a tag ("Run workflow", pick the tag) to
+# republish an existing release.
 #
 # One-time setup: Settings -> Pages -> Source: GitHub Actions. If deployments
 # from tags are refused, allow `v*` tags under Settings -> Environments ->
 # github-pages -> Deployment branches and tags.
 on:
-  push:
-    tags: ['v*']
+  workflow_call:
   workflow_dispatch:
 
 permissions:

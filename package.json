@@ -30,6 +30,7 @@
   },
   "files": [
     "dist",
+    "!dist/web",
     "GRAMMAR.md",
     "EDITORS.md"
   ],
@@ -45,7 +46,7 @@
     "check": "npm run typecheck && npm test",
     "estorm": "node src/cli.ts",
     "examples": "node scripts/render-examples.ts",
-    "preversion": "npm run check",
+    "preversion": "node scripts/check-release.ts && npm run check",
     "postversion": "git push --follow-tags"
   },
   "devDependencies": {
