@@ -27,7 +27,8 @@
   },
   "files": [
     "dist",
-    "GRAMMAR.md"
+    "GRAMMAR.md",
+    "EDITORS.md"
   ],
   "engines": {
     "node": ">=22.18"
