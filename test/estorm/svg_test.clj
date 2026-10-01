@@ -24,3 +24,8 @@
                 parser/parse layout/layout svg/svg)]
     (is (str/includes? doc ">Billing</text>"))
     (is (str/includes? doc "class=\"link\""))))
+
+(deftest cancels
+  (let [doc (-> "A: Do -> Done\n  after 1 day unless Gone\n    then B -> BDone\nX: Go -> Gone"
+                parser/parse layout/layout svg/svg)]
+    (is (str/includes? doc "class=\"cancel\""))))

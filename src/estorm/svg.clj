@@ -8,6 +8,7 @@
    :command    "#74c0fc"
    :actor      "#fff3bf"
    :policy     "#d0bfff"
+   :schedule   "#e5dbff"
    :aggregate  "#ffd43b"
    :external   "#f7a8c8"
    :read-model "#8ce99a"
@@ -72,6 +73,14 @@
 (defn- gap [{:keys [x y w h]}]
   [:rect {:class "gap" :x x :y y :width w :height h :fill "#e9ecef"}])
 
+(defn- cancel
+  "Arrow from the 'unless' event of an 'after' into the delayed policy:
+  dotted red, it cancels the timer."
+  [points]
+  [:path {:class "cancel" :d (path-d points)
+          :fill "none" :stroke "#e03131" :stroke-width 1.5 :stroke-dasharray "2 3"
+          :marker-end "url(#cancel)"}])
+
 (defn- lane [{:keys [name line x y]}]
   [:g {:class "lane" :data-line line}
    [:text {:x (+ x 20) :y (+ y 36) :font-size 15 :font-weight "bold" :fill "#495057"} name]])
@@ -81,12 +90,15 @@
    [:marker {:id "arrow" :viewBox "0 0 10 10" :refX 9 :refY 5
              :markerWidth 7 :markerHeight 7 :orient "auto-start-reverse"}
     [:path {:d "M0 0 L10 5 L0 10 z" :fill "#868e96"}]]
+   [:marker {:id "cancel" :viewBox "0 0 10 10" :refX 9 :refY 5
+             :markerWidth 7 :markerHeight 7 :orient "auto-start-reverse"}
+    [:path {:d "M0 0 L10 5 L0 10 z" :fill "#e03131"}]]
    [:filter {:id "shadow" :x "-10%" :y "-10%" :width "130%" :height "130%"}
     [:feDropShadow {:dx 2 :dy 3 :stdDeviation 2 :flood-opacity 0.2}]]])
 
 (defn svg
   "Layout into a standalone SVG document string."
-  [{:keys [width height stickies arrows links lanes gaps]}]
+  [{:keys [width height stickies arrows links cancels lanes gaps]}]
   (str (h/html {:mode :xml}
                [:svg {:xmlns "http://www.w3.org/2000/svg"
                       :width width :height height
@@ -98,4 +110,5 @@
                 (map lane lanes)
                 (map arrow arrows)
                 (map link links)
+                (map cancel cancels)
                 (map sticky stickies)])))

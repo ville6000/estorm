@@ -112,6 +112,36 @@
                                            "when BDone"
                                            "  then C -> CDone")))))))
 
+(deftest time-triggers
+  (testing "after: delayed reactions, optionally cancelled by an event"
+    (let [[flow] (parser/parse (lines "A: Do -> Done"
+                                      "  after 30 days unless Gone"
+                                      "    {Info}"
+                                      "    then B -> BDone"
+                                      "      ! Why?"
+                                      "  after 1 hour"
+                                      "    then C -> CDone"
+                                      "X: Go -> Gone"))
+          [after after2] (:reactions flow)]
+      (is (= {:type :after :line 2 :duration "30 days" :unless "Gone" :hotspots []}
+             (dissoc after :reactions)))
+      (is (= ["B"] (map :command (:reactions after))))
+      (is (= ["Info"] (map :name (:informed-by (first (:reactions after))))))
+      (is (= ["Why?"] (map :text (:hotspots (first (:reactions after))))))
+      (is (= "1 hour" (:duration after2)))
+      (is (not (contains? after2 :unless)))))
+  (testing "after under when"
+    (is (= :after (-> (parser/parse (lines "A: Do -> Done"
+                                           "when Done"
+                                           "  after 2 days"
+                                           "    then B -> BDone"))
+                      second :reactions first :type))))
+  (testing "every: a flow driven by a schedule; the time may contain colons"
+    (is (= {:type :flow :schedule "night at 02:00" :command "Archive" :event "Archived"}
+           (-> (parser/parse "every night at 02:00: Archive -> Archived")
+               first
+               (select-keys [:type :schedule :actor :command :event]))))))
+
 (deftest errors
   (are [expected text] (= expected (error-of text))
    [1 "'then' has no parent flow"] "then Do -> Done"
@@ -137,6 +167,13 @@
    [1 "'when' expects an event name, got (Done)"] "when (Done)"
    [2 "'when' has no reactions"] (lines "A: Do -> Done" "when Done")
    [1 "'when' refers to unknown event Nope"] "when Nope\n  then B -> BDone"
+   [1 "'after' has no parent flow"] (lines "after 1 day" "  then B -> BDone")
+   [2 "'after' has no reactions"] (lines "A: Do -> Done" "  after 1 day")
+   [2 "'unless' refers to unknown event Nope"] (lines "A: Do -> Done" "  after 1 day unless Nope" "    then B -> BDone")
+   [2 "'unless' expects an event name, got (Nope)"] (lines "A: Do -> Done" "  after 1 day unless (Nope)")
+   [3 "hotspot must follow a flow or reaction, not 'after'"]
+   (lines "A: Do -> Done" "  after 1 day" "  ! Why?" "    then B -> BDone")
+   [1 "chain must end with an event"] "every day: Archive"
    [3 "hotspot must follow a flow or reaction, not 'when'"]
    (lines "A: Do -> Done" "when Done" "! Why?" "  then B -> BDone")))
 

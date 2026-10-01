@@ -124,3 +124,23 @@
     (let [{:keys [height links]} (board "== A ==" "X: Do -> Done"
                                         "== B ==" "when Done" "  then B -> BDone")]
       (is (every? #(< (second %) height) (apply concat links))))))
+
+(deftest time-triggers
+  (let [{:keys [stickies cancels arrows]} (board "A: Do -> Done"
+                                                 "  after 30 days unless Gone"
+                                                 "    then B -> BDone"
+                                                 "every night at 02:00: Go -> Gone")
+        find (fn [kind] (first (filter #(= kind (:kind %)) stickies)))
+        policy (find :policy)
+        schedule (find :schedule)
+        done (first (filter #(= "Done" (:text %)) stickies))]
+    (testing "delayed policy, under its event"
+      (is (= "⏰ 30 days after Done, unless Gone" (:text policy)))
+      (is (= (:x done) (:x policy))))
+    (is (= 1 (count cancels)) "cancel link from the unless event")
+    (is (= [(:y policy)] (map (comp second last) cancels)) "into the policy")
+    (testing "schedule takes the actor's place, touching its command"
+      (is (= "⏰ every night at 02:00" (:text schedule)))
+      (is (= (+ (:x schedule) (:w schedule))
+             (:x (first (filter #(= "Go" (:text %)) stickies))))))
+    (is (= 4 (count arrows)) "trigger arrow and chain arrows; the cancel is separate")))

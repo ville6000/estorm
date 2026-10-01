@@ -53,7 +53,12 @@
             [_ read-model] (re-matches #"\{([^{}]+)\}" text)
             [_ then-rest] (re-matches #"then\s+(.+)" text)
             [_ when-event] (re-matches #"when\s+(.+)" text)
-            [_ actor flow-rest] (re-matches #"([^:]+):(.*)" text)]
+            [after? duration unless] (re-matches #"after\s+(.+?)(?:\s+unless\s+(.+))?" text)
+            [_ schedule schedule-rest] (re-matches #"every\s+(.+?):\s+(.*)" text)
+            [_ actor flow-rest] (re-matches #"([^:]+):(.*)" text)
+            check-event (fn [keyword event]
+                          (when-not (and (re-matches name-re event) (not (str/includes? event "->")))
+                            (fail n (str "'" keyword "' expects an event name, got " event))))]
         (cond
           (str/starts-with? text "!")
           (let [t (str/trim (subs text 1))]
@@ -70,9 +75,17 @@
 
           when-event
           (let [event (str/trim when-event)]
-            (when-not (and (re-matches name-re event) (not (str/includes? event "->")))
-              (fail n (str "'when' expects an event name, got " event)))
+            (check-event "when" event)
             (assoc stmt :type :when :event event))
+
+          after?
+          (let [unless (some-> unless str/trim)]
+            (some->> unless (check-event "unless"))
+            (cond-> (assoc stmt :type :after :duration (str/trim duration))
+              unless (assoc :unless unless)))
+
+          schedule
+          (merge stmt {:type :flow :schedule (str/trim schedule)} (parse-chain n schedule-rest))
 
           then-rest
           (merge stmt {:type :reaction} (parse-chain n then-rest))
@@ -92,17 +105,19 @@
               (fail line "flow must not be indented"))
       :when (when (pos? level)
               (fail line "'when' must not be indented"))
-      :reaction (cond
-                  (or (zero? level) (nil? prev))
-                  (fail line "'then' has no parent flow")
-                  (> level (inc prev))
-                  (fail line "'then' must be one level deeper than its parent")))))
+      (:reaction :after)
+      (let [keyword (if (= :after type) "after" "then")]
+        (cond
+          (or (zero? level) (nil? prev))
+          (fail line (str "'" keyword "' has no parent flow"))
+          (> level (inc prev))
+          (fail line (str "'" keyword "' must be one level deeper than its parent")))))))
 
 (defn- dangling [{:keys [line name]}]
   (fail line (str "read model {" name "} informs nothing")))
 
 (defn- collect
-  "Reducer: flat list of steps (flows, whens and reactions), top-level
+  "Reducer: flat list of steps (flows, whens, afters and reactions), top-level
   board items (hotspots and sections), and read models waiting for the
   step they inform. A hotspot goes to the latest step in its section,
   which caused it; with no such step it is top-level."
@@ -113,8 +128,9 @@
           current (:current acc)]
       (cond
         (nil? current) (update acc :board conj hotspot)
-        (= :when (get-in acc [:steps current :type]))
-        (fail (:line stmt) "hotspot must follow a flow or reaction, not 'when'")
+        (#{:when :after} (get-in acc [:steps current :type]))
+        (fail (:line stmt) (str "hotspot must follow a flow or reaction, not '"
+                                (name (get-in acc [:steps current :type])) "'"))
         :else (update-in acc [:steps current :hotspots] conj hotspot)))
     :section
     (do (some-> (first (:pending acc)) dangling)
@@ -122,7 +138,7 @@
             (update :board conj (dissoc stmt :level))
             (assoc :current nil)))
     :read-model (update acc :pending conj stmt)
-    :when
+    (:when :after)
     (do (check-level (:steps acc) stmt)
         (-> acc
             (update :steps conj (assoc stmt :hotspots []))
@@ -155,27 +171,40 @@
                              (assoc :reactions (nest children (inc level)))))))
       acc)))
 
+(defn- produces-event? [step]
+  (#{:flow :reaction} (:type step)))
+
 (defn- events
-  "All events produced by TREES of steps. A 'when' produces none itself."
+  "All events produced by TREES of steps. 'when' and 'after' produce none
+  themselves."
   [trees]
   (mapcat #(cond->> (events (:reactions %))
-             (not= :when (:type %)) (cons (:event %)))
+             (produces-event? %) (cons (:event %)))
           trees))
 
-(defn- check-whens
-  "Each 'when' needs reactions and an event that some step produces."
+(defn- all-steps [trees]
+  (mapcat #(cons % (all-steps (:reactions %))) trees))
+
+(defn- check-triggers
+  "Each 'when' and 'after' needs reactions, and the events they name must
+  be produced by some step."
   [trees]
   (let [known (set (events trees))]
-    (doseq [{:keys [type line event reactions]} trees
-            :when (= :when type)]
+    (doseq [{:keys [type line event unless reactions]} (all-steps trees)
+            :when (#{:when :after} type)
+            :let [keyword (name type)]]
       (when (empty? reactions)
-        (fail line "'when' has no reactions"))
-      (when-not (known event)
-        (fail line (str "'when' refers to unknown event " event))))))
+        (fail line (str "'" keyword "' has no reactions")))
+      (when (and event (not (known event)))
+        (fail line (str "'when' refers to unknown event " event)))
+      (when (and unless (not (known unless)))
+        (fail line (str "'unless' refers to unknown event " unless))))))
 
 (defn parse
   "Parses estorm text into a vector of top-level items (flows, whens,
-  sections and board hotspots), in source order."
+  sections and board hotspots), in source order. Flows and reactions nest
+  their reactions; an 'after' sits among them, holding the reactions it
+  delays."
   [text]
   (let [{:keys [steps board pending]}
         (->> (str/split-lines text)
@@ -184,7 +213,7 @@
              (reduce collect {:steps [] :board [] :pending [] :current nil}))
         trees (nest steps 0)]
     (some-> (first pending) dangling)
-    (check-whens trees)
+    (check-triggers trees)
     (->> (concat trees board)
          (sort-by :line)
          vec)))

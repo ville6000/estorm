@@ -49,14 +49,20 @@
                [[rail below] [rail above] [px above]])
              [[px (:y policy)]]))))
 
+(defn- policy-text [{:keys [text after]}]
+  (if-let [{:keys [duration unless]} after]
+    (str "⏰ " duration " after " text (when unless (str ", unless " unless)))
+    (str "whenever " text)))
+
 (defn- chain
   "[kind text line] for each sticky of STEP's row, in time order."
   [step trigger]
   (let [line (:line step)]
     (concat (for [rm (:informed-by step)] [:read-model (:name rm) (:line rm)])
-            [(if trigger
-               [:policy (str "whenever " (:text trigger)) line]
-               [:actor (:actor step) line])
+            [(cond
+               trigger [:policy (policy-text trigger) line]
+               (:schedule step) [:schedule (str "⏰ every " (:schedule step)) line]
+               :else [:actor (:actor step) line])
              [:command (:command step) line]]
             (for [v (:via step)] [(:type v) (:name v) line])
             [[:event (:event step) line]])))
@@ -64,7 +70,7 @@
 (def ^:private group-kinds
   "Kinds that touch the sticky after them: read models, actor or policy,
   and their command form one group."
-  #{:read-model :actor :policy})
+  #{:read-model :actor :schedule :policy})
 
 (defn- row-xs
   "Lane-local x of each sticky of a row of KINDS starting at X0."
@@ -79,12 +85,22 @@
   (let [from (drop-while (comp group-kinds :kind) placed)]
     (map arrow from (rest from))))
 
+(declare place-row)
+
 (defn- place-step
   "Places STEP on the next free row with its actor or policy at lane-local
   X, then its reactions below it, starting under its event. TRIGGER is the
   event sticky a reaction reacts to, nil for a flow. Reactions of a 'when'
   have a trigger with :pending set: the event is placed elsewhere, so the
-  link is drawn later."
+  link is drawn later. An 'after' has no row: it passes the trigger on to
+  its reactions, delayed, and their policies get a cancel link from its
+  'unless' event."
+  [board step x trigger]
+  (if (= :after (:type step))
+    (reduce #(place-step %1 %2 x (assoc trigger :after step)) board (:reactions step))
+    (place-row board step x trigger)))
+
+(defn- place-row
   [board step x trigger]
   (let [y (:y board)
         items (chain step trigger)
@@ -96,16 +112,20 @@
         hotspots (map-indexed (fn [i h] (sticky :hotspot (:text h) (:line h)
                                                 (+ (:x event) (col-x (inc i))) y))
                               (:hotspots step))
+        policy (when trigger (nth placed (count (:informed-by step))))
+        unless (get-in trigger [:after :unless])
         board (cond-> (-> board
                           (update :stickies into (concat placed hotspots))
                           (update :arrows into (flow-arrows placed))
                           (update :y + sticky-h gap-y))
                 trigger
                 (update (if (:pending trigger) :pending-links :arrows) conj
-                        (let [policy (nth placed (count (:informed-by step)))]
-                          (if (:pending trigger)
-                            {:event (:text trigger) :policy policy :group-x start}
-                            (branch trigger policy start)))))]
+                        (if (:pending trigger)
+                          {:event (:text trigger) :policy policy :group-x start :kind :link}
+                          (branch trigger policy start)))
+                unless
+                (update :pending-links conj
+                        {:event unless :policy policy :group-x start :kind :cancel}))]
     (reduce #(place-step %1 %2 (:x event) event) board (:reactions step))))
 
 (defn- event-positions
@@ -194,19 +214,20 @@
                                 pending-links))))
 
 (defn- link
-  "Elbow arrow from the first event sticky named EVENT into POLICY."
-  [stickies {:keys [event policy group-x]}]
+  "Elbow arrow from the first event sticky named EVENT into POLICY. Cancel
+  links run beside 'when' links."
+  [stickies {:keys [event policy group-x kind]}]
   (branch (first (filter #(and (= :event (:kind %)) (= event (:text %))) stickies))
           policy
           group-x
-          6))
+          (if (= :cancel kind) -6 6)))
 
 (defn layout
   "AST into {:width :height :stickies [{:kind :text :line :x :y :w :h}]
-  :arrows [[[x y] ...] ...] :links [[[x y] ...] ...]
+  :arrows [[[x y] ...] ...] :links [[[x y] ...] ...] :cancels [...]
   :lanes [{:name :line :x :y :w :h}] :gaps [{:x :y :w :h}]}. Lanes are
   LANE-GAP apart; gaps are the space between them. Links are the arrows of 'when'
-  reactions; lanes are the named sections, as full-height bands. Lays out
+  reactions, cancels those from the 'unless' event of an 'after'; lanes are the named sections, as full-height bands. Lays out
   until event positions settle: a 'when' may refer to an event placed
   further down, or to one placed by another 'when'."
   [ast]
@@ -221,15 +242,18 @@
         placed (map (fn [lane x] (shift (+ x lane-pad) lane)) lanes band-xs)
         stickies (vec (mapcat :stickies placed))
         arrows (vec (mapcat :arrows placed))
-        links (mapv #(link stickies %) (mapcat :pending-links placed))
+        {links :link cancels :cancel} (group-by :kind (mapcat :pending-links placed))
+        links (mapv #(link stickies %) links)
+        cancels (mapv #(link stickies %) cancels)
         width (if (seq band-ws) (- (last band-xs) lane-gap) 0)
         height (+ margin (apply max 0 (concat (map #(+ (:y %) (:h %)) stickies)
-                                              (map second (apply concat (concat arrows links))))))]
+                                              (map second (apply concat (concat arrows links cancels))))))]
     {:width width
      :height height
      :stickies stickies
      :arrows arrows
      :links links
+     :cancels cancels
      :lanes (vec (for [[lane x w] (map vector lanes band-xs band-ws)
                        :when (:name lane)]
                    {:name (:name lane) :line (:line lane) :x x :y 0 :w w :h height}))

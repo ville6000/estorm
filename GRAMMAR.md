@@ -21,6 +21,8 @@ Customer: Submit ticket -> (Ticket) -> TicketSubmitted
 | `Actor:`         | actor           | pale yellow |
 | text after `:` / `then` | command  | blue        |
 | `then`           | policy          | lilac       |
+| `after … then`   | delayed policy (⏰) | lilac    |
+| `every …:`       | schedule (⏰)   | pale lilac  |
 | `(Name)`         | aggregate       | yellow      |
 | `[Name]`         | external system | pink        |
 | `{Name}`         | read model      | green       |
@@ -47,6 +49,25 @@ flow or reaction above it, and issues a command. The policy sticky is labelled
 ```
   then Command -> Event
   then Command -> [External] -> (Aggregate) -> Event
+```
+
+**After** — delays the `then` reactions under it: they happen DURATION
+after the parent's event, unless the `unless` event happens first. Like a
+`then`, it is one level deeper than its parent (a flow, reaction or `when`),
+and its reactions one level deeper still. DURATION is free text. The
+`unless` event must be produced somewhere in the file; a red dotted arrow
+links it to the delayed policies.
+
+```
+  after 30 days unless CustomerFollowedUp
+    then Close ticket -> (Ticket) -> TicketClosed
+```
+
+**Schedule** — a flow driven by time instead of an actor. SCHEDULE is free
+text and may contain colons; a colon followed by a space ends it.
+
+```
+every night at 02:00: Command -> Event
 ```
 
 **When** — reacts to an event by name instead of by indentation, usually
@@ -81,7 +102,7 @@ lane.
 **Hotspot** — a question or problem, caused by the nearest flow or reaction
 above it in the same section. Hotspots before the first flow belong to the
 whole board; right after a section header, to that section. A hotspot
-directly after `when` is an error.
+directly after `when` or `after` is an error.
 Indentation doesn't change the cause; indent under the step for readability.
 
 ```
@@ -106,7 +127,8 @@ Whitespace around `->` is ignored. Item text is trimmed and may contain spaces.
 ## Indentation
 
 - Indent with spaces only, 2 per level. Tabs are an error.
-- Flows, `when` and sections start at column 0.
+- Flows, schedules, `when` and sections start at column 0.
+- An `after` line follows the same rules as `then`.
 - A `then` line must be exactly one level deeper than its parent.
 
 ## Grammar (EBNF)
@@ -114,7 +136,7 @@ Whitespace around `->` is ignored. Item text is trimmed and may contain spaces.
 ```ebnf
 document   = { line , newline } ;
 line       = blank | comment | hotspot | read-model | flow | reaction
-           | when | section ;
+           | when | after | schedule | section ;
 
 blank      = { " " } ;
 comment    = indent , "#" , text ;
@@ -123,6 +145,8 @@ read-model = indent , "{" , name , "}" ;
 flow       = name , ":" , name , chain ;
 reaction   = indent , "then" , " " , name , chain ;
 when       = "when" , " " , name ;
+after      = indent , "after" , " " , text , [ " unless " , name ] ;
+schedule   = "every" , " " , text , ": " , name , chain ;
 section    = "==" , text , "==" ;
 
 chain      = { arrow , ( aggregate | external ) } , arrow , name ;
@@ -171,6 +195,15 @@ A read model with no following flow or reaction is an error.
 Hotspots go into `:hotspots` of the flow or reaction that caused them. Board
 and section hotspots are top-level, in source order with the flows.
 
+An `after` sits in its parent's `:reactions`, holding the reactions it
+delays. A schedule is a flow with `:schedule` instead of `:actor`:
+
+```clojure
+{:type :after :line 10 :duration "30 days" :unless "CustomerFollowedUp"
+ :hotspots [] :reactions [{:type :reaction :line 11 ...}]}
+{:type :flow :line 19 :schedule "night at 02:00" :command "Archive tickets" ...}
+```
+
 Sections are top-level markers; an item belongs to the nearest section above.
 A `when` takes its reactions:
 
@@ -193,8 +226,8 @@ Report as `<file>:<line>: <message>`, e.g.
 - `tickets.estorm:3: unrecognised line`
 - `tickets.estorm:20: 'when' refers to unknown event TicketSubmited`
 - `tickets.estorm:20: 'when' has no reactions`
+- `tickets.estorm:10: 'unless' refers to unknown event CustomerFolowedUp`
 
 ## Open questions
 
 - One command → several events? (`-> A, B`)
-- Time-triggered policies (e.g. "30 days after TicketCompleted")?
