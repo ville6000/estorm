@@ -67,8 +67,9 @@ diff before committing them.
 
 ## Releasing
 
-1. Bump `version` in package.json.
-2. Tag `vX.Y.Z` and push the tag. The release workflow builds and attaches
-   `estorm.html` to a GitHub release with generated notes, and the Pages
-   workflow publishes it to <https://ville6000.github.io/estorm/>.
-3. Edit the release notes on GitHub if needed; they are the changelog.
+1. On an up-to-date `main`, run `npm version <patch|minor|major> -m "Release %s"`.
+   It runs `npm run check`, bumps the version, commits, tags `vX.Y.Z` and
+   pushes both. The release workflow builds and attaches `estorm.html` to a
+   GitHub release with generated notes, and the Pages workflow publishes it
+   to <https://ville6000.github.io/estorm/>.
+2. Edit the release notes on GitHub if needed; they are the changelog.
