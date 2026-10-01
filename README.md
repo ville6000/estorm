@@ -51,8 +51,6 @@ open it. It is a single self-contained file that works offline: edit on the
 left, see the board on the right, click a sticky to jump to its line, open
 and save `.estorm` files, and export SVG.
 
-![The browser editor: estorm text on the left, the rendered board on the right](docs/editor.png)
-
 It is also hosted at <https://ville6000.github.io/estorm/>, updated on
 each release.
 
