@@ -9,7 +9,8 @@ You need Node.js 22.18 or later (see `.nvmrc`).
 
 ```sh
 npm install
-npm run check   # typecheck and tests; run before every pull request
+npm run check   # typecheck, formatting and tests; run before every pull request
+npm run format  # format everything with Prettier
 npm run dev     # the browser editor, reloading as you change the code
 ```
 
