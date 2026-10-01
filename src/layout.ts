@@ -19,15 +19,7 @@ export const LANE_PAD = 30;
 export const LANE_GAP = 80;
 
 export type Kind =
-  | 'read-model'
-  | 'actor'
-  | 'schedule'
-  | 'policy'
-  | 'command'
-  | 'aggregate'
-  | 'external'
-  | 'event'
-  | 'hotspot';
+  'read-model' | 'actor' | 'schedule' | 'policy' | 'command' | 'aggregate' | 'external' | 'event' | 'hotspot';
 
 export interface Sticky {
   kind: Kind;
@@ -216,9 +208,7 @@ function placeRow(lane: LaneBoard, step: Flow | Reaction, x: number, trigger?: T
   );
   const placed = items.map(([kind, text, line], i) => sticky(kind, text, line, xs[i]!, y));
   const event = placed.at(-1)!;
-  const hotspots = step.hotspots.map((h: Hotspot, i) =>
-    sticky('hotspot', h.text, h.line, event.x + colX(i + 1), y),
-  );
+  const hotspots = step.hotspots.map((h: Hotspot, i) => sticky('hotspot', h.text, h.line, event.x + colX(i + 1), y));
   lane.stickies.push(...placed, ...hotspots);
   lane.arrows.push(...flowArrows(placed));
   lane.y += STICKY_H + GAP_Y;
@@ -405,11 +395,7 @@ export function layout(board: Board): Layout {
   const width = bandWs.length ? bandXs.at(-1)! - LANE_GAP : 0;
   const height =
     MARGIN +
-    Math.max(
-      0,
-      ...stickies.map((s) => s.y + s.h),
-      ...[...arrows, ...links, ...cancels].flat().map(([, y]) => y),
-    );
+    Math.max(0, ...stickies.map((s) => s.y + s.h), ...[...arrows, ...links, ...cancels].flat().map(([, y]) => y));
 
   return {
     width,

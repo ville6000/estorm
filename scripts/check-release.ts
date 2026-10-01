@@ -13,4 +13,5 @@ const fail = (message: string) => {
 
 if (git('branch', '--show-current') !== 'main') fail('release from main');
 git('fetch', '--quiet', 'origin', 'main');
-if (git('rev-parse', 'HEAD') !== git('rev-parse', 'origin/main')) fail('main differs from origin/main; pull or push first');
+if (git('rev-parse', 'HEAD') !== git('rev-parse', 'origin/main'))
+  fail('main differs from origin/main; pull or push first');

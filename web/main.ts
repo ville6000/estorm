@@ -166,7 +166,7 @@ function highlightLines(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
   const current = eventAtCursor(view.state);
   for (const { from, to } of view.visibleRanges) {
-    for (let pos = from; pos <= to; ) {
+    for (let pos = from; pos <= to;) {
       const line = view.state.doc.lineAt(pos);
       for (const t of tokenize(line.text)) {
         const match = t.kind === 'event' && line.text.slice(t.from, t.to) === current;
@@ -407,9 +407,7 @@ state.vim = storage(() => localStorage.getItem(VIM_KEY) === '1') ?? false;
 vimButton.setAttribute('aria-pressed', String(state.vim));
 
 const draft = storage(() => JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null')) as
-  | { name: string; text: string }
-  | null
-  | undefined;
+  { name: string; text: string } | null | undefined;
 if (draft && typeof draft.text === 'string') {
   load(draft.text, draft.name || 'untitled.estorm', null, '');
 } else {

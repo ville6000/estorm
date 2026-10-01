@@ -136,9 +136,7 @@ describe('parse', () => {
 
     it('gives a hotspot to the nearest step above', () => {
       expect(flow.hotspots.map((h) => h.text)).toEqual(['caused by Do']);
-      expect((flow.reactions[0] as Reaction).hotspots.map((h) => h.text)).toEqual([
-        'caused by B, despite indent',
-      ]);
+      expect((flow.reactions[0] as Reaction).hotspots.map((h) => h.text)).toEqual(['caused by B, despite indent']);
     });
   });
 
@@ -176,9 +174,9 @@ describe('parse', () => {
 
     it('lets a when refer to an event further down, or from another when', () => {
       expect(
-        parse(
-          lines('when Done', '  then B -> BDone', 'A: Do -> Done', 'when BDone', '  then C -> CDone'),
-        ).map((i) => i.type),
+        parse(lines('when Done', '  then B -> BDone', 'A: Do -> Done', 'when BDone', '  then C -> CDone')).map(
+          (i) => i.type,
+        ),
       ).toEqual(['when', 'flow', 'when']);
     });
   });
@@ -199,9 +197,9 @@ describe('parse', () => {
 
     it('lets when and unless refer to it', () => {
       expect(
-        parse(
-          lines('Paid', 'Placed', 'when Placed', '  after 1 day unless Paid', '    then Cancel -> Cancelled'),
-        ).map((i) => i.type),
+        parse(lines('Paid', 'Placed', 'when Placed', '  after 1 day unless Paid', '    then Cancel -> Cancelled')).map(
+          (i) => i.type,
+        ),
       ).toEqual(['event', 'event', 'when']);
     });
   });
@@ -276,11 +274,23 @@ describe('parse', () => {
     [1, "'when' refers to unknown event Nope", lines('when Nope', '  then B -> BDone')],
     [1, "'after' has no parent flow", lines('after 1 day', '  then B -> BDone')],
     [2, "'after' has no reactions", lines('A: Do -> Done', '  after 1 day')],
-    [2, "'unless' refers to unknown event Nope", lines('A: Do -> Done', '  after 1 day unless Nope', '    then B -> BDone')],
+    [
+      2,
+      "'unless' refers to unknown event Nope",
+      lines('A: Do -> Done', '  after 1 day unless Nope', '    then B -> BDone'),
+    ],
     [2, "'unless' expects an event name, got (Nope)", lines('A: Do -> Done', '  after 1 day unless (Nope)')],
-    [3, "hotspot must follow a flow or reaction, not 'after'", lines('A: Do -> Done', '  after 1 day', '  ! Why?', '    then B -> BDone')],
+    [
+      3,
+      "hotspot must follow a flow or reaction, not 'after'",
+      lines('A: Do -> Done', '  after 1 day', '  ! Why?', '    then B -> BDone'),
+    ],
     [1, 'chain must end with an event', 'every day: Archive'],
-    [3, "hotspot must follow a flow or reaction, not 'when'", lines('A: Do -> Done', 'when Done', '! Why?', '  then B -> BDone')],
+    [
+      3,
+      "hotspot must follow a flow or reaction, not 'when'",
+      lines('A: Do -> Done', 'when Done', '! Why?', '  then B -> BDone'),
+    ],
   ])('reports line %i: %s', (line, message, text) => {
     expect(errorOf(text)).toEqual([line, message]);
   });
