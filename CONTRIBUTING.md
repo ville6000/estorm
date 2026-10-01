@@ -69,7 +69,12 @@ diff before committing them.
 
 1. On an up-to-date `main`, run `npm version <patch|minor|major> -m "Release %s"`.
    It runs `npm run check`, bumps the version, commits, tags `vX.Y.Z` and
-   pushes both. The release workflow builds and attaches `estorm.html` to a
-   GitHub release with generated notes, and the Pages workflow publishes it
-   to <https://ville6000.github.io/estorm/>.
+   pushes both. The release workflow publishes the package to npm and
+   attaches `estorm.html` to a GitHub release with generated notes, and the
+   Pages workflow publishes it to <https://ville6000.github.io/estorm/>.
 2. Edit the release notes on GitHub if needed; they are the changelog.
+
+The tag drives everything, so never create tags or releases in the GitHub UI
+and never edit `version` by hand. If the release workflow fails on something
+transient, re-run it. Otherwise delete the tag and any release it made, fix
+the cause and release the next patch version.
