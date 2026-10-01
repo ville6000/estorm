@@ -9,6 +9,7 @@ labels: enhancement
 **Proposed syntax** (an example `.estorm` snippet)
 
 ```
+
 ```
 
 **How should it look?**

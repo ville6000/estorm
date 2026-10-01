@@ -19,11 +19,7 @@ const LINE_HEIGHT = 16;
 const PADDING = 8;
 
 function escape(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 type Attrs = Record<string, string | number | undefined>;
@@ -45,9 +41,7 @@ function splitWord(word: string, maxChars: number): [string, boolean][] {
   const parts =
     word.length <= maxChars
       ? [word]
-      : word
-          .split(/(?<=[a-z])(?=[A-Z])/)
-          .flatMap((p) => p.match(new RegExp(`.{1,${maxChars}}`, 'gu')) ?? [p]);
+      : word.split(/(?<=[a-z])(?=[A-Z])/).flatMap((p) => p.match(new RegExp(`.{1,${maxChars}}`, 'gu')) ?? [p]);
   return parts.map((p, i) => [p, i === 0]);
 }
 

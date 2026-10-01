@@ -27,19 +27,19 @@ and never go stale on a whiteboard photo.
 
 ## Notation at a glance
 
-| Syntax                              | Sticky                                   |
-| ----------------------------------- | ---------------------------------------- |
-| `Event`                             | event, cause not known yet; a run of them is a timeline |
-| `Actor: Command -> Event`           | actor, command, event (actor optional)   |
-| `-> (Aggregate) ->` / `-> [External] ->` | aggregate / external system         |
-| `{Read model}`                      | read model, informing the next step      |
-| `  then Command -> Event`           | policy reacting to the event above       |
-| `  after 30 days unless Event`      | delayed policy, cancelled by an event    |
-| `every night at 02:00: Command -> Event` | flow driven by a schedule           |
-| `when Event`                        | policy reacting to an event by name      |
-| `== Context ==`                     | bounded context, drawn as a lane         |
-| `! Question?`                       | hotspot                                  |
-| `# comment`                         | ignored                                  |
+| Syntax                                   | Sticky                                                  |
+| ---------------------------------------- | ------------------------------------------------------- |
+| `Event`                                  | event, cause not known yet; a run of them is a timeline |
+| `Actor: Command -> Event`                | actor, command, event (actor optional)                  |
+| `-> (Aggregate) ->` / `-> [External] ->` | aggregate / external system                             |
+| `{Read model}`                           | read model, informing the next step                     |
+| `  then Command -> Event`                | policy reacting to the event above                      |
+| `  after 30 days unless Event`           | delayed policy, cancelled by an event                   |
+| `every night at 02:00: Command -> Event` | flow driven by a schedule                               |
+| `when Event`                             | policy reacting to an event by name                     |
+| `== Context ==`                          | bounded context, drawn as a lane                        |
+| `! Question?`                            | hotspot                                                 |
+| `# comment`                              | ignored                                                 |
 
 The full notation, with every rule and error message, is in
 [GRAMMAR.md](GRAMMAR.md). More examples are in [examples/](examples/).

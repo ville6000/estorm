@@ -162,7 +162,10 @@ describe('estorm lsp', () => {
     child.stdin.write(bytes.subarray(0, 30));
     child.stdin.write(bytes.subarray(30));
     expect(await exited).toBe(0);
-    const bodies = out.split(/Content-Length: \d+\r\n\r\n/).filter(Boolean).map((b) => JSON.parse(b));
+    const bodies = out
+      .split(/Content-Length: \d+\r\n\r\n/)
+      .filter(Boolean)
+      .map((b) => JSON.parse(b));
     expect(bodies.map((b) => b.id ?? b.method)).toEqual([1, 'textDocument/publishDiagnostics', 2]);
   });
 });

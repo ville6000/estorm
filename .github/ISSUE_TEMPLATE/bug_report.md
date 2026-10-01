@@ -7,6 +7,7 @@ labels: bug
 **Board** (the smallest `.estorm` text that shows the problem)
 
 ```
+
 ```
 
 **What happens** (error message, or a screenshot of the board)

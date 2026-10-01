@@ -16,19 +16,19 @@ Customer: Submit ticket -> (Ticket) -> TicketSubmitted
 
 ## Sticky types
 
-| Syntax           | Sticky          | Colour      |
-|------------------|-----------------|-------------|
-| `Actor:`         | actor           | pale yellow |
-| first chain item | command         | blue        |
-| `then`           | policy          | lilac       |
-| `after … then`   | delayed policy (⏰) | lilac    |
-| `every …:`       | schedule (⏰)   | pale lilac  |
-| `(Name)`         | aggregate       | yellow      |
-| `[Name]`         | external system | pink        |
-| `{Name}`         | read model      | green       |
-| last chain item, or a name on its own line | event | orange |
-| `! text`         | hotspot         | red         |
-| `== Name ==`     | section (lane)  | white lane, grey gap |
+| Syntax                                     | Sticky              | Colour               |
+| ------------------------------------------ | ------------------- | -------------------- |
+| `Actor:`                                   | actor               | pale yellow          |
+| first chain item                           | command             | blue                 |
+| `then`                                     | policy              | lilac                |
+| `after … then`                             | delayed policy (⏰) | lilac                |
+| `every …:`                                 | schedule (⏰)       | pale lilac           |
+| `(Name)`                                   | aggregate           | yellow               |
+| `[Name]`                                   | external system     | pink                 |
+| `{Name}`                                   | read model          | green                |
+| last chain item, or a name on its own line | event               | orange               |
+| `! text`                                   | hotspot             | red                  |
+| `== Name ==`                               | section (lane)      | white lane, grey gap |
 
 ## Statements
 

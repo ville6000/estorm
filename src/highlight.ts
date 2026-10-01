@@ -28,10 +28,7 @@ export function tokenize(line: string): Token[] {
     parts.forEach((part, i) => {
       const item = part.trim();
       const kind: TokenKind =
-        i === 0 ? 'command'
-        : item.startsWith('(') ? 'aggregate'
-        : item.startsWith('[') ? 'external'
-        : 'event';
+        i === 0 ? 'command' : item.startsWith('(') ? 'aggregate' : item.startsWith('[') ? 'external' : 'event';
       add(kind, at, at + part.length);
       at += part.length;
       if (i < parts.length - 1) add('arrow', at, (at += 2));
