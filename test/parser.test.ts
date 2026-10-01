@@ -92,6 +92,13 @@ describe('parse', () => {
       });
     });
 
+    it('allows a flow without an actor', () => {
+      const [flow] = parse(lines('Place order -> (Order) -> OrderPlaced', '  then Ship -> Shipped')) as [Flow];
+      expect(flow).toMatchObject({ type: 'flow', command: 'Place order', event: 'OrderPlaced' });
+      expect(flow).not.toHaveProperty('actor');
+      expect(flow.reactions).toHaveLength(1);
+    });
+
     it('accepts Windows line endings', () => {
       expect(parse('A: Do -> Done\r\n  then B -> BDone\r\n')).toHaveLength(1);
     });
@@ -254,7 +261,8 @@ describe('parse', () => {
     [1, 'invalid actor: [Sys]', '[Sys]: Do -> Done'],
     [1, 'empty hotspot', '!'],
     [1, 'unrecognised line', 'just (some) prose'],
-    [1, 'unrecognised line', 'Do -> Done'],
+    [1, 'expected a command, got (Order)', '(Order) -> Done'],
+    [2, 'flow must not be indented', lines('A: Do -> Done', '  B -> BDone')],
     [2, 'event must not be indented', lines('A: Do -> Done', '  Done twice')],
     [1, 'read model {X} informs nothing', lines('{X}', 'Done')],
     [1, 'read model {X} informs nothing', '{X}'],

@@ -135,14 +135,17 @@ type Row = [Kind, string, number][];
 /** [kind, text, line] for each sticky of STEP's row, in time order. */
 function chain(step: Flow | Reaction, trigger: Trigger | undefined): Row {
   const { line } = step;
-  const lead: [Kind, string, number] = trigger
-    ? ['policy', policyText(trigger), line]
-    : step.type === 'flow' && step.schedule !== undefined
-      ? ['schedule', `⏰ every ${step.schedule}`, line]
-      : ['actor', (step as Flow).actor ?? '', line];
+  const flow = step.type === 'flow' ? step : undefined;
+  const lead: Row = trigger
+    ? [['policy', policyText(trigger), line]]
+    : flow?.schedule !== undefined
+      ? [['schedule', `⏰ every ${flow.schedule}`, line]]
+      : flow?.actor !== undefined
+        ? [['actor', flow.actor, line]]
+        : [];
   return [
     ...step.informedBy.map((rm): [Kind, string, number] => ['read-model', rm.name, rm.line]),
-    lead,
+    ...lead,
     ['command', step.command, line],
     ...step.via.map((v): [Kind, string, number] => [v.type, v.name, line]),
     ['event', step.event, line],

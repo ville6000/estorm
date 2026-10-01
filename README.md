@@ -27,7 +27,7 @@ and never go stale on a whiteboard photo.
 | Syntax                              | Sticky                                   |
 | ----------------------------------- | ---------------------------------------- |
 | `Event`                             | event, cause not known yet; a run of them is a timeline |
-| `Actor: Command -> Event`           | actor, command, event                    |
+| `Actor: Command -> Event`           | actor, command, event (actor optional)   |
 | `-> (Aggregate) ->` / `-> [External] ->` | aggregate / external system         |
 | `{Read model}`                      | read model, informing the next step      |
 | `  then Command -> Event`           | policy reacting to the event above       |
