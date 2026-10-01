@@ -1,12 +1,12 @@
 /**
  * Places AST stickies on the board. Time runs left to right; every flow and
- * reaction gets its own row, and a reaction starts under the event that
+ * reaction gets its own row, consecutive events on their own share one, and a reaction starts under the event that
  * triggered it. Sections are vertical lanes, side by side in order of first
  * appearance. A 'when' reaction is linked to the event it names by a dashed
  * arrow; in another lane it starts at the lane's left edge, level with that
  * event if the lane is free there.
  */
-import type { After, Board, Flow, Hotspot, Reaction, Step, When } from './parser.ts';
+import type { After, Board, Event, Flow, Hotspot, Reaction, Step, When } from './parser.ts';
 
 export const STICKY_W = 150;
 export const STICKY_H = 100;
@@ -235,6 +235,27 @@ function placeRow(lane: LaneBoard, step: Flow | Reaction, x: number, trigger?: T
   for (const r of step.reactions) placeStep(lane, r, event.x, { text: event.text, sticky: event });
 }
 
+/**
+ * Places EVENTS on one row, left to right, each followed by its hotspots;
+ * then the reactions of the last, starting under it. Only the last may have
+ * reactions: they end the row.
+ */
+function placeEvents(lane: LaneBoard, events: Event[]): void {
+  const { y } = lane;
+  let x = 0;
+  let last: Sticky | undefined;
+  for (const e of events) {
+    last = sticky('event', e.name, e.line, x, y);
+    const hotspots = e.hotspots.map((h, i) => sticky('hotspot', h.text, h.line, x + colX(i + 1), y));
+    lane.stickies.push(last, ...hotspots);
+    x += colX(hotspots.length + 1);
+  }
+  lane.y += STICKY_H + GAP_Y;
+  for (const r of events.at(-1)?.reactions ?? []) {
+    placeStep(lane, r, last!.x, { text: last!.text, sticky: last! });
+  }
+}
+
 interface Position {
   lane: LaneKey;
   x: number;
@@ -271,7 +292,8 @@ function placeHotspotRow(lane: LaneBoard, hotspots: Hotspot[]): void {
 
 /**
  * One layout pass, in lane-local x. Items before the first section go to an
- * unnamed lane (key null). Consecutive top-level hotspots share a row.
+ * unnamed lane (key null). Consecutive top-level hotspots share a row, and so
+ * do consecutive events.
  */
 function placeAll(board: Board, positions: Map<string, Position>): LaneBoard[] {
   const top = MARGIN + (board.some((i) => i.type === 'section') ? LANE_LABEL_H : 0);
@@ -291,12 +313,27 @@ function placeAll(board: Board, positions: Map<string, Position>): LaneBoard[] {
     if (hotspots.length) placeHotspotRow(lane(current), hotspots);
     hotspots = [];
   };
+  let events: Event[] = [];
+  const flushEvents = () => {
+    if (events.length) {
+      placeEvents(lane(current), events);
+      lane(current).y += FLOW_GAP;
+    }
+    events = [];
+  };
   for (const item of board) {
     if (item.type === 'hotspot') {
+      flushEvents();
       hotspots.push(item);
       continue;
     }
     flushHotspots();
+    if (item.type === 'event') {
+      events.push(item);
+      if (item.reactions.length) flushEvents();
+      continue;
+    }
+    flushEvents();
     switch (item.type) {
       case 'section':
         current = item.name;
@@ -313,6 +350,7 @@ function placeAll(board: Board, positions: Map<string, Position>): LaneBoard[] {
     }
   }
   flushHotspots();
+  flushEvents();
   return [...lanes.values()];
 }
 

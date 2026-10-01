@@ -26,7 +26,7 @@ Customer: Submit ticket -> (Ticket) -> TicketSubmitted
 | `(Name)`         | aggregate       | yellow      |
 | `[Name]`         | external system | pink        |
 | `{Name}`         | read model      | green       |
-| last chain item  | event           | orange      |
+| last chain item, or a name on its own line | event | orange |
 | `! text`         | hotspot         | red         |
 | `== Name ==`     | section (lane)  | white lane, grey gap |
 
@@ -82,6 +82,20 @@ when Event
   then Command -> Event
 ```
 
+**Event** — a name on its own line: an event whose cause isn't known yet,
+as in the first, chaotic phase of Event Storming. Consecutive events form a
+timeline, one row left to right, with no arrows between them. Later, turn a
+line into a flow by adding its actor and command. Like the event of a flow,
+it can take hotspots and `then` reactions (which end its row), and `when` and
+`unless` can name it.
+
+```
+OrderPlaced
+PaymentCaptured
+! What if payment fails?
+OrderShipped
+```
+
 **Section** — starts a bounded context. Everything below, up to the next
 section, belongs to it, and is drawn in its own vertical lane. Lanes sit
 side by side, left to right, in order of first appearance; rows stack
@@ -99,8 +113,8 @@ lane.
 {Name}
 ```
 
-**Hotspot** — a question or problem, caused by the nearest flow or reaction
-above it in the same section. Hotspots before the first flow belong to the
+**Hotspot** — a question or problem, caused by the nearest flow, reaction or
+event above it in the same section. Hotspots before the first flow belong to the
 whole board; right after a section header, to that section. A hotspot
 directly after `when` or `after` is an error.
 Indentation doesn't change the cause; indent under the step for readability.
@@ -127,7 +141,7 @@ Whitespace around `->` is ignored. Item text is trimmed and may contain spaces.
 ## Indentation
 
 - Indent with spaces only, 2 per level. Tabs are an error.
-- Flows, schedules, `when` and sections start at column 0.
+- Flows, schedules, events, `when` and sections start at column 0.
 - An `after` line follows the same rules as `then`.
 - A `then` line must be exactly one level deeper than its parent.
 
@@ -136,7 +150,7 @@ Whitespace around `->` is ignored. Item text is trimmed and may contain spaces.
 ```ebnf
 document   = { line , newline } ;
 line       = blank | comment | hotspot | read-model | flow | reaction
-           | when | after | schedule | section ;
+           | when | after | schedule | section | event ;
 
 blank      = { " " } ;
 comment    = indent , "#" , text ;
@@ -148,6 +162,7 @@ when       = "when" , " " , name ;
 after      = indent , "after" , " " , text , [ " unless " , name ] ;
 schedule   = "every" , " " , text , ": " , name , chain ;
 section    = "==" , text , "==" ;
+event      = name ;
 
 chain      = { arrow , ( aggregate | external ) } , arrow , name ;
 arrow      = "->" ;
@@ -247,6 +262,7 @@ Indentation
 - `indentation must be a multiple of 2 spaces`
 - `flow must not be indented` (also for schedules)
 - `'when' must not be indented`
+- `event must not be indented`
 - `section must not be indented`
 - `'then' has no parent flow` (also `'after'`)
 - `'then' must be one level deeper than its parent` (also `'after'`)

@@ -59,6 +59,32 @@ describe('layout', () => {
     });
   });
 
+  describe('events on their own', () => {
+    it('puts consecutive events on one row, without arrows', () => {
+      const { stickies, arrows } = board('Placed', 'Paid', 'Shipped');
+      expect(stickies.map((s) => s.kind)).toEqual(['event', 'event', 'event']);
+      expect(new Set(stickies.map((s) => s.y)).size).toBe(1);
+      expect(right(stickies[0]!)).toBeLessThan(stickies[1]!.x);
+      expect(right(stickies[1]!)).toBeLessThan(stickies[2]!.x);
+      expect(arrows).toEqual([]);
+    });
+
+    it('puts hotspots right after their event in the row', () => {
+      const [placed, hotspot, paid] = board('Placed', '! Why?', 'Paid').stickies;
+      expect([placed!.kind, hotspot!.kind, paid!.kind]).toEqual(['event', 'hotspot', 'event']);
+      expect(hotspot!.y).toBe(placed!.y);
+      expect(paid!.x).toBeGreaterThan(hotspot!.x);
+    });
+
+    it('starts a new row after a flow, or after an event with reactions', () => {
+      const { stickies } = board('Placed', 'A: Do -> Done', 'Paid', '  then Ship -> Shipped', 'Packed');
+      const ys = ['Placed', 'Done', 'Paid', 'whenever Paid', 'Packed'].map((t) => find(stickies, t).y);
+      expect(ys).toEqual([...ys].sort((a, b) => a - b));
+      expect(new Set(ys).size).toBe(5);
+      expect(find(stickies, 'whenever Paid').x).toBe(find(stickies, 'Paid').x);
+    });
+  });
+
   it('fits the board around stickies', () => {
     const { width, height, stickies } = board('A: Do -> Done', '  then B -> BDone');
     expect(stickies.every((s) => s.x + s.w <= width && s.y + s.h <= height)).toBe(true);

@@ -6,6 +6,8 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- A name on its own line is an event, for collecting events before their
+  causes are known. Consecutive events form a timeline on one row.
 - The editor is published to GitHub Pages on each release.
 - The editor uses CodeMirror and has optional vim keybindings (toggle with
   the Vim button; `:w` saves).
