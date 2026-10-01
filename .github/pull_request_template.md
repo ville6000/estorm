@@ -1,4 +1,3 @@
 - [ ] `npm run check` passes
 - [ ] Notation changes are documented in GRAMMAR.md, with tests
 - [ ] Visual changes: `npm run examples` run and the SVG diffs reviewed
-- [ ] CHANGELOG.md updated
