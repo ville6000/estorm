@@ -65,6 +65,18 @@ export interface When {
   reactions: Step[];
 }
 
+/**
+ * An event on its own, before its cause is known. Consecutive ones form a
+ * timeline; policies may react to it like to the event of a flow.
+ */
+export interface Event {
+  type: 'event';
+  line: number;
+  name: string;
+  hotspots: Hotspot[];
+  reactions: Step[];
+}
+
 /** Starts a bounded context; items below belong to it. */
 export interface Section {
   type: 'section';
@@ -73,7 +85,7 @@ export interface Section {
 }
 
 export type Step = Reaction | After;
-export type TopLevel = Flow | When | Section | Hotspot;
+export type TopLevel = Flow | Event | When | Section | Hotspot;
 export type Board = TopLevel[];
 
 export class ParseError extends Error {
@@ -128,6 +140,7 @@ type Stmt = { line: number; level: number } & (
   | { type: 'after'; duration: string; unless?: string }
   | ({ type: 'flow'; actor?: string; schedule?: string } & Chain)
   | ({ type: 'reaction' } & Chain)
+  | { type: 'event'; name: string }
 );
 
 function checkEventName(line: number, keyword: string, event: string): void {
@@ -186,11 +199,14 @@ function classify(n: number, raw: string): Stmt | null {
     if (!NAME.test(actor)) fail(n, `invalid actor: ${actor}`);
     return { ...base, type: 'flow', actor, ...parseChain(n, m[2]!) };
   }
+  if (NAME.test(text) && !text.includes('->')) {
+    return { ...base, type: 'event', name: text };
+  }
   return fail(n, 'unrecognised line');
 }
 
 /** A step while collecting: a flow, when, after or reaction, flat. */
-type Flat = (Flow | When | After | Reaction) & { level: number };
+type Flat = (Flow | Event | When | After | Reaction) & { level: number };
 
 function checkLevel(steps: Flat[], { type, level, line }: Stmt): void {
   const prev = steps.at(-1)?.level;
@@ -200,6 +216,9 @@ function checkLevel(steps: Flat[], { type, level, line }: Stmt): void {
       break;
     case 'when':
       if (level > 0) fail(line, "'when' must not be indented");
+      break;
+    case 'event':
+      if (level > 0) fail(line, 'event must not be indented');
       break;
     case 'reaction':
     case 'after': {
@@ -258,6 +277,13 @@ function collect(acc: Acc, stmt: Stmt): Acc {
       acc.current = acc.steps.length - 1;
       return acc;
     }
+    case 'event': {
+      checkLevel(acc.steps, stmt);
+      if (acc.pending[0]) dangling(acc.pending[0]);
+      acc.steps.push({ ...stmt, hotspots: [], reactions: [] });
+      acc.current = acc.steps.length - 1;
+      return acc;
+    }
     case 'flow':
     case 'reaction': {
       checkLevel(acc.steps, stmt);
@@ -278,12 +304,14 @@ function collect(acc: Acc, stmt: Stmt): Acc {
   }
 }
 
+type Node = Flow | Event | When | Step;
+
 /**
  * Turns a flat list of steps into a tree, each step taking the deeper steps
  * that follow it as reactions.
  */
-function nest(steps: Flat[], level: number): (Flow | When | Step)[] {
-  const out: (Flow | When | Step)[] = [];
+function nest(steps: Flat[], level: number): Node[] {
+  const out: Node[] = [];
   let i = 0;
   while (i < steps.length) {
     const { level: _, ...step } = steps[i]!;
@@ -294,8 +322,6 @@ function nest(steps: Flat[], level: number): (Flow | When | Step)[] {
   }
   return out;
 }
-
-type Node = Flow | When | Step;
 
 function* allSteps(trees: Node[]): Generator<Node> {
   for (const t of trees) {
@@ -309,6 +335,7 @@ function checkTriggers(trees: Node[]): void {
   const known = new Set<string>();
   for (const s of allSteps(trees)) {
     if (s.type === 'flow' || s.type === 'reaction') known.add(s.event);
+    if (s.type === 'event') known.add(s.name);
   }
   for (const s of allSteps(trees)) {
     if (s.type !== 'when' && s.type !== 'after') continue;
@@ -323,8 +350,8 @@ function checkTriggers(trees: Node[]): void {
 }
 
 /**
- * Parses estorm text into top-level items (flows, whens, sections and board
- * hotspots), in source order. Flows and reactions nest their reactions; an
+ * Parses estorm text into top-level items (flows, events, whens, sections and
+ * board hotspots), in source order. Flows and reactions nest their reactions; an
  * 'after' sits among them, holding the reactions it delays.
  */
 export function parse(text: string): Board {
@@ -336,5 +363,5 @@ export function parse(text: string): Board {
   const trees = nest(acc.steps, 0);
   if (acc.pending[0]) dangling(acc.pending[0]);
   checkTriggers(trees);
-  return [...(trees as (Flow | When)[]), ...acc.board].sort((a, b) => a.line - b.line);
+  return [...(trees as (Flow | Event | When)[]), ...acc.board].sort((a, b) => a.line - b.line);
 }

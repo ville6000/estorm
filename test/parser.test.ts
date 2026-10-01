@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parse, ParseError } from '../src/parser.ts';
-import type { After, Flow, Hotspot, Reaction, When } from '../src/parser.ts';
+import type { After, Event, Flow, Hotspot, Reaction, When } from '../src/parser.ts';
 
 const lines = (...ls: string[]) => ls.join('\n');
 
@@ -176,6 +176,29 @@ describe('parse', () => {
     });
   });
 
+  describe('events on their own', () => {
+    it('reads a bare name as an event', () => {
+      expect(parse(lines('OrderPlaced', 'Order shipped'))).toEqual([
+        { type: 'event', line: 1, name: 'OrderPlaced', hotspots: [], reactions: [] },
+        { type: 'event', line: 2, name: 'Order shipped', hotspots: [], reactions: [] },
+      ]);
+    });
+
+    it('gives an event its hotspots and reactions', () => {
+      const [event] = parse(lines('OrderPlaced', '! Paid yet?', '  then Ship -> Shipped')) as [Event];
+      expect(event.hotspots.map((h) => h.text)).toEqual(['Paid yet?']);
+      expect((event.reactions[0] as Reaction).event).toBe('Shipped');
+    });
+
+    it('lets when and unless refer to it', () => {
+      expect(
+        parse(
+          lines('Paid', 'Placed', 'when Placed', '  after 1 day unless Paid', '    then Cancel -> Cancelled'),
+        ).map((i) => i.type),
+      ).toEqual(['event', 'event', 'when']);
+    });
+  });
+
   describe('time triggers', () => {
     it('delays reactions with after, optionally cancelled by an event', () => {
       const [flow] = parse(
@@ -230,7 +253,10 @@ describe('parse', () => {
     [1, 'invalid item: {X}', 'A: Do -> {X} -> Done'],
     [1, 'invalid actor: [Sys]', '[Sys]: Do -> Done'],
     [1, 'empty hotspot', '!'],
-    [1, 'unrecognised line', 'just some prose'],
+    [1, 'unrecognised line', 'just (some) prose'],
+    [1, 'unrecognised line', 'Do -> Done'],
+    [2, 'event must not be indented', lines('A: Do -> Done', '  Done twice')],
+    [1, 'read model {X} informs nothing', lines('{X}', 'Done')],
     [1, 'read model {X} informs nothing', '{X}'],
     [2, 'read model {X} informs nothing', lines('A: Do -> Done', '  {X}', 'B: Go -> Gone')],
     [2, 'read model {X} informs nothing', lines('A: Do -> Done', '{X}', '== S ==')],

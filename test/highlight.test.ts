@@ -66,10 +66,15 @@ describe('tokenize', () => {
     expect(tokens('== Sales ==')).toEqual([['section', '== Sales ==']]);
   });
 
+  it('marks a bare name as an event', () => {
+    expect(tokens('OrderPlaced')).toEqual([['event', 'OrderPlaced']]);
+  });
+
   it('leaves blank and unrecognised lines plain', () => {
     expect(tokens('')).toEqual([]);
     expect(tokens('   ')).toEqual([]);
-    expect(tokens('just words')).toEqual([]);
+    expect(tokens('just (words)')).toEqual([]);
+    expect(tokens('Do -> Done')).toEqual([]);
   });
 
   it('copes with incomplete lines while typing', () => {
