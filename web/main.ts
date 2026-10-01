@@ -2,6 +2,10 @@
  * The estorm editor: edit a board on the left, see it on the right. Runs
  * entirely in the browser; the build inlines everything into one HTML file.
  */
+import { Compartment, EditorState, RangeSet, StateEffect, StateField } from '@codemirror/state';
+import { drawSelection, EditorView, GutterMarker, keymap, lineNumberMarkers, lineNumbers } from '@codemirror/view';
+import { defaultKeymap, history, historyKeymap, insertNewlineKeepIndent } from '@codemirror/commands';
+import { vim, Vim } from '@replit/codemirror-vim';
 import { layout, parse, ParseError, svg } from '../src/index.ts';
 
 // File System Access API: Chromium only, so feature-detected.
@@ -20,6 +24,7 @@ declare global {
 
 const PICKER_TYPES = [{ description: 'estorm board', accept: { 'text/plain': ['.estorm'] } }];
 const DRAFT_KEY = 'estorm:draft';
+const VIM_KEY = 'estorm:vim';
 const ZOOMS = [0.25, 0.33, 0.5, 0.67, 0.8, 1, 1.25, 1.5, 2];
 
 const examples = Object.fromEntries(
@@ -29,8 +34,6 @@ const examples = Object.fromEntries(
 );
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const source = $<HTMLTextAreaElement>('source');
-const gutter = $<HTMLPreElement>('gutter');
 const board = $<HTMLDivElement>('board');
 const errorBar = $<HTMLButtonElement>('error');
 const fileName = $<HTMLSpanElement>('file-name');
@@ -38,6 +41,7 @@ const fileInput = $<HTMLInputElement>('file-input');
 const examplePicker = $<HTMLSelectElement>('examples');
 const cheatsheet = $<HTMLElement>('cheatsheet');
 const helpButton = $<HTMLButtonElement>('help');
+const vimButton = $<HTMLButtonElement>('vim');
 
 const state = {
   name: 'untitled.estorm',
@@ -46,6 +50,7 @@ const state = {
   errorLine: null as number | null,
   zoom: 1,
   size: { width: 0, height: 0 },
+  vim: false,
 };
 
 function storage<T>(f: () => T): T | undefined {
@@ -59,7 +64,7 @@ function storage<T>(f: () => T): T | undefined {
 // --- rendering ---------------------------------------------------------------
 
 function renderBoard(): void {
-  const text = source.value;
+  const text = sourceText();
   try {
     const l = layout(parse(text));
     board.innerHTML = svg(l);
@@ -75,18 +80,10 @@ function renderBoard(): void {
     errorBar.hidden = false;
     board.classList.add('stale');
   }
-  renderGutter();
+  view.dispatch({ effects: setErrorLine.of(state.errorLine) });
   fileName.textContent = state.name;
   fileName.classList.toggle('dirty', text !== state.saved);
   storage(() => localStorage.setItem(DRAFT_KEY, JSON.stringify({ name: state.name, text })));
-}
-
-function renderGutter(): void {
-  const count = source.value.split('\n').length;
-  gutter.innerHTML = Array.from({ length: count }, (_, i) =>
-    i + 1 === state.errorLine ? `<span class="bad">${i + 1}</span>` : String(i + 1),
-  ).join('\n');
-  gutter.scrollTop = source.scrollTop;
 }
 
 let pending = 0;
@@ -119,39 +116,86 @@ function zoomToFit(): void {
   applyZoom();
 }
 
-// --- editing -----------------------------------------------------------------
+// --- editing ---------------------------------------------------------------
+
+/** Marks the line number of the line with a parse error. */
+const setErrorLine = StateEffect.define<number | null>();
+const badLine = new (class extends GutterMarker {
+  override elementClass = 'bad';
+})();
+const errorLineField = StateField.define<RangeSet<GutterMarker>>({
+  create: () => RangeSet.empty,
+  update(markers, tr) {
+    for (const e of tr.effects) {
+      if (!e.is(setErrorLine)) continue;
+      const line = e.value;
+      if (line === null || line > tr.state.doc.lines) return RangeSet.empty;
+      return RangeSet.of(badLine.range(tr.state.doc.line(line).from));
+    }
+    return markers.map(tr.changes);
+  },
+  provide: (f) => lineNumberMarkers.from(f),
+});
+
+// Vim must come first so its keys win over the default keymap.
+const vimMode = new Compartment();
+
+function createState(text: string): EditorState {
+  return EditorState.create({
+    doc: text,
+    extensions: [
+      vimMode.of(state.vim ? vim({ status: true }) : []),
+      lineNumbers(),
+      errorLineField,
+      history(),
+      drawSelection(),
+      EditorState.tabSize.of(2),
+      keymap.of([
+        {
+          key: 'Tab',
+          run: (v) => (v.dispatch(v.state.replaceSelection('  '), { scrollIntoView: true, userEvent: 'input' }), true),
+        },
+        // Keep the indentation of the current line.
+        { key: 'Enter', run: insertNewlineKeepIndent },
+        ...defaultKeymap,
+        ...historyKeymap,
+      ]),
+      EditorView.contentAttributes.of({
+        'aria-label': 'estorm source',
+        spellcheck: 'false',
+        autocapitalize: 'off',
+        autocorrect: 'off',
+      }),
+      EditorView.updateListener.of((u) => {
+        if (u.docChanged) scheduleRender();
+      }),
+    ],
+  });
+}
+
+const view = new EditorView({ parent: $('source') });
+
+function sourceText(): string {
+  return view.state.doc.toString();
+}
 
 function goToLine(line: number): void {
-  const lines = source.value.split('\n');
-  const start = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
-  source.focus();
-  source.setSelectionRange(start, start + (lines[line - 1]?.length ?? 0));
-  const lineHeight = parseFloat(getComputedStyle(source).lineHeight) || 20;
-  source.scrollTop = Math.max(0, (line - 3) * lineHeight);
+  if (line > view.state.doc.lines) return;
+  const { from, to } = view.state.doc.line(line);
+  view.dispatch({ selection: { anchor: from, head: to }, effects: EditorView.scrollIntoView(from, { y: 'center' }) });
+  view.focus();
 }
 
-/** Inserts text at the cursor, keeping the browser's undo history where possible. */
-function insert(text: string): void {
-  if (!document.execCommand('insertText', false, text)) {
-    source.setRangeText(text, source.selectionStart, source.selectionEnd, 'end');
-    scheduleRender();
-  }
+function setVim(on: boolean): void {
+  state.vim = on;
+  view.dispatch({ effects: vimMode.reconfigure(on ? vim({ status: true }) : []) });
+  vimButton.setAttribute('aria-pressed', String(on));
+  storage(() => localStorage.setItem(VIM_KEY, on ? '1' : ''));
 }
 
-source.addEventListener('input', scheduleRender);
-source.addEventListener('scroll', () => (gutter.scrollTop = source.scrollTop));
-source.addEventListener('keydown', (e) => {
-  if (e.key === 'Tab' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
-    e.preventDefault();
-    insert('  ');
-  } else if (e.key === 'Enter' && !e.isComposing) {
-    // Keep the indentation of the current line.
-    const before = source.value.slice(0, source.selectionStart);
-    const indent = before.slice(before.lastIndexOf('\n') + 1).match(/^ */)![0];
-    e.preventDefault();
-    insert('\n' + indent);
-  }
-});
+// :w and :saveas in vim mode.
+Vim.defineEx('write', 'w', () => void save());
+Vim.defineEx('saveas', 'sav', () => void saveAs());
 
 board.addEventListener('click', (e) => {
   const g = (e.target as Element).closest('[data-line]');
@@ -165,7 +209,7 @@ errorBar.addEventListener('click', () => {
 // --- files -------------------------------------------------------------------
 
 function load(text: string, name: string, handle: FileHandle | null, saved = text): void {
-  source.value = text;
+  view.setState(createState(text));
   state.name = name;
   state.handle = handle;
   state.saved = saved;
@@ -173,7 +217,7 @@ function load(text: string, name: string, handle: FileHandle | null, saved = tex
 }
 
 function confirmDiscard(): boolean {
-  return source.value === state.saved || confirm('Discard unsaved changes?');
+  return sourceText() === state.saved || confirm('Discard unsaved changes?');
 }
 
 async function open(): Promise<void> {
@@ -205,7 +249,7 @@ function download(name: string, text: string, type: string): void {
 
 async function writeTo(handle: FileHandle): Promise<void> {
   const w = await handle.createWritable();
-  await w.write(source.value);
+  await w.write(sourceText());
   await w.close();
 }
 
@@ -221,22 +265,22 @@ async function saveAs(): Promise<void> {
       throw e;
     }
   } else {
-    download(state.name, source.value, 'text/plain');
+    download(state.name, sourceText(), 'text/plain');
   }
-  state.saved = source.value;
+  state.saved = sourceText();
   renderBoard();
 }
 
 async function save(): Promise<void> {
   if (!state.handle) return saveAs();
   await writeTo(state.handle);
-  state.saved = source.value;
+  state.saved = sourceText();
   renderBoard();
 }
 
 function exportSvg(): void {
   try {
-    download(state.name.replace(/\.estorm$/, '') + '.svg', svg(layout(parse(source.value))) + '\n', 'image/svg+xml');
+    download(state.name.replace(/\.estorm$/, '') + '.svg', svg(layout(parse(sourceText()))) + '\n', 'image/svg+xml');
   } catch (e) {
     if (!(e instanceof ParseError)) throw e;
     alert(`Fix the error first: line ${e.line}: ${e.message}`);
@@ -251,7 +295,7 @@ document.addEventListener('drop', async (e) => {
 });
 
 window.addEventListener('beforeunload', (e) => {
-  if (source.value !== state.saved && state.handle) e.preventDefault();
+  if (sourceText() !== state.saved && state.handle) e.preventDefault();
 });
 
 document.addEventListener('keydown', (e) => {
@@ -282,6 +326,10 @@ $('zoom-reset').addEventListener('click', () => {
   applyZoom();
 });
 $('zoom-fit').addEventListener('click', zoomToFit);
+vimButton.addEventListener('click', () => {
+  setVim(!state.vim);
+  view.focus();
+});
 
 helpButton.addEventListener('click', () => {
   cheatsheet.hidden = !cheatsheet.hidden;
@@ -298,6 +346,9 @@ examplePicker.addEventListener('change', () => {
 });
 
 // --- start -------------------------------------------------------------------
+
+state.vim = storage(() => localStorage.getItem(VIM_KEY) === '1') ?? false;
+vimButton.setAttribute('aria-pressed', String(state.vim));
 
 const draft = storage(() => JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null')) as
   | { name: string; text: string }

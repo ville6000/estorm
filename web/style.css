@@ -45,9 +45,14 @@ select:hover {
   border-color: var(--muted);
 }
 
+button[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
 button:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
+select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -102,42 +107,51 @@ textarea:focus-visible {
 }
 
 .editor {
-  display: flex;
   flex: 1;
   min-height: 0;
+}
+
+.editor .cm-editor {
+  height: 100%;
+  color: var(--text);
+}
+
+.editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+.editor .cm-scroller {
   font: 13px/20px var(--mono);
 }
 
-.gutter {
-  margin: 0;
-  padding: 12px 8px;
+.editor .cm-content {
+  padding: 12px 0;
+}
+
+.editor .cm-line {
+  padding: 0 12px;
+}
+
+.editor .cm-gutters {
   min-width: 3.5em;
-  overflow: hidden;
-  text-align: right;
   color: var(--muted);
   background: #f8f9fa;
   border-right: 1px solid var(--border);
-  user-select: none;
-  font: inherit;
 }
 
-.gutter .bad {
+.editor .cm-lineNumbers .cm-gutterElement {
+  padding: 0 8px;
+}
+
+.editor .cm-lineNumbers .cm-gutterElement.bad {
   color: var(--error);
   font-weight: bold;
 }
 
-textarea {
-  flex: 1;
-  margin: 0;
-  padding: 12px;
-  border: 0;
-  resize: none;
-  white-space: pre;
-  overflow: auto;
-  font: inherit;
-  color: var(--text);
-  background: transparent;
-  tab-size: 2;
+.editor .cm-panels {
+  font-family: var(--mono);
+  background: #f8f9fa;
+  border-color: var(--border);
 }
 
 .error {
