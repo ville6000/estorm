@@ -23,7 +23,9 @@ estorm is a small pipeline. Each step is a pure function in its own file:
 | `src/layout.ts`     | AST to positioned stickies, arrows, lanes                    |
 | `src/svg.ts`        | layout to an SVG string                                      |
 | `src/index.ts`      | public API: `parse`, `layout`, `svg`, `render`               |
-| `src/cli.ts`        | `estorm render / check / serve`                              |
+| `src/highlight.ts`  | one line to tokens, for the editor and the language server   |
+| `src/lsp.ts`        | `estorm lsp`: language server over stdio                     |
+| `src/cli.ts`        | `estorm render / check / serve / lsp`                        |
 | `web/`              | the browser editor, built into one file, `estorm.html`       |
 | `examples/`         | example boards and their rendered SVGs                       |
 

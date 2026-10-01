@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { tokenize } from '../web/highlight.ts';
+import { tokenize } from '../src/highlight.ts';
 
 /** [kind, text] pairs, for readable expectations. */
 const tokens = (line: string) => tokenize(line).map((t) => [t.kind, line.slice(t.from, t.to)]);
