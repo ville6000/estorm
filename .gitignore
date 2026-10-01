@@ -1,0 +1,15 @@
+# Clojure tooling
+.cpcache/
+.nrepl-port
+.lsp/.cache/
+.clj-kondo/.cache/
+.clj-kondo/imports/
+.calva/
+.portal/
+target/
+
+# OS / editors
+.DS_Store
+.idea/
+*.iml
+.vscode/

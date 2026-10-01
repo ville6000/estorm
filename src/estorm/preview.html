@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>estorm · {{file}}</title>
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; background: #f1f3f5; }
+  #error { display: none; position: sticky; top: 0; margin: 0; padding: 10px 16px;
+           background: #ffe3e3; color: #c92a2a; white-space: pre-wrap; }
+  #error.show { display: block; }
+  #diagram { padding: 16px; }
+  #diagram.stale { opacity: 0.4; }
+</style>
+</head>
+<body>
+<pre id="error"></pre>
+<div id="diagram"></div>
+<script>
+  // Polls the server; swaps in the new SVG when it changes, shows parse
+  // errors on top of the last good diagram.
+  const error = document.getElementById('error');
+  const diagram = document.getElementById('diagram');
+  let last = null;
+
+  async function refresh() {
+    try {
+      const res = await fetch('/diagram.svg', { cache: 'no-store' });
+      const body = await res.text();
+      if (res.ok) {
+        error.classList.remove('show');
+        diagram.classList.remove('stale');
+        if (body !== last) { diagram.innerHTML = body; last = body; }
+      } else {
+        error.textContent = body;
+        error.classList.add('show');
+        diagram.classList.add('stale');
+      }
+    } catch (e) {
+      // server stopped; keep showing the last diagram
+    }
+    setTimeout(refresh, 1000);
+  }
+  refresh();
+</script>
+</body>
+</html>

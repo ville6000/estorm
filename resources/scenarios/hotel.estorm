@@ -1,0 +1,18 @@
+# Hotel booking
+{Room availability}
+Guest: Book room -> (Booking) -> RoomBooked
+  then Take deposit -> [Payment provider] -> DepositTaken
+  then Send booking confirmation -> [Email service] -> BookingConfirmationSent
+
+Guest: Check in -> (Booking) -> GuestCheckedIn
+  then Issue key card -> [Door lock system] -> KeyCardIssued
+
+{Guest folio}
+Receptionist: Check out guest -> (Booking) -> GuestCheckedOut
+  then Charge remaining balance -> [Payment provider] -> BalanceCharged
+    ! What if the card on file has expired?
+  then Mark room dirty -> (Room) -> RoomMarkedDirty
+
+{Rooms to clean}
+Housekeeper: Clean room -> (Room) -> RoomCleaned
+  then Release room for sale -> (Room) -> RoomAvailable

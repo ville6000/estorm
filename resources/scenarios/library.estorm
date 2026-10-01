@@ -1,0 +1,17 @@
+# Library loans
+{Catalogue search results}
+Member: Borrow book -> (Loan) -> (Copy) -> BookBorrowed
+  then Set due date -> (Loan) -> DueDateSet
+
+Member: Renew loan -> (Loan) -> LoanRenewed
+  ! How many renewals are allowed?
+
+{Loans past due date}
+Librarian: Send overdue reminder -> [Email service] -> OverdueReminderSent
+  then Charge late fee -> (Member account) -> LateFeeCharged
+    ! Are late fees waived for children?
+
+Member: Return book -> (Loan) -> BookReturned
+  then Close loan -> (Loan) -> LoanClosed
+  {Reservation queue}
+  then Notify next in queue -> [SMS gateway] -> ReservationReady

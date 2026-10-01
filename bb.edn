@@ -1,0 +1,24 @@
+{:paths ["src" "test"]
+ :tasks
+ {:requires ([babashka.fs :as fs]
+             [clojure.string :as str])
+
+  test {:doc "Run all *_test.clj namespaces"
+        :requires ([clojure.test :as t])
+        :task (let [nss (for [f (fs/glob "test" "**_test.clj")]
+                          (-> (str (fs/strip-ext (fs/relativize "test" f)))
+                              (str/replace "/" ".")
+                              (str/replace "_" "-")
+                              symbol))]
+                (apply require nss)
+                (let [{:keys [fail error]} (apply t/run-tests nss)]
+                  (when (pos? (+ fail error))
+                    (System/exit 1))))}
+
+  render {:doc "Render notation to SVG: bb render <in.estorm> [out.svg]"
+          :requires ([estorm.main :as main])
+          :task (apply main/render *command-line-args*)}
+
+  serve {:doc "Live preview in browser: bb serve <in.estorm> [port]"
+         :requires ([estorm.main :as main])
+         :task (apply main/serve *command-line-args*)}}}
