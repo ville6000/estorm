@@ -66,6 +66,16 @@ describe('tokenize', () => {
     expect(tokens('== Sales ==')).toEqual([['section', '== Sales ==']]);
   });
 
+  it('reads a chain without an actor as a command and its event', () => {
+    expect(tokens('Place order -> (Order) -> OrderPlaced')).toEqual([
+      ['command', 'Place order'],
+      ['arrow', '->'],
+      ['aggregate', '(Order)'],
+      ['arrow', '->'],
+      ['event', 'OrderPlaced'],
+    ]);
+  });
+
   it('marks a bare name as an event', () => {
     expect(tokens('OrderPlaced')).toEqual([['event', 'OrderPlaced']]);
   });
@@ -74,7 +84,6 @@ describe('tokenize', () => {
     expect(tokens('')).toEqual([]);
     expect(tokens('   ')).toEqual([]);
     expect(tokens('just (words)')).toEqual([]);
-    expect(tokens('Do -> Done')).toEqual([]);
   });
 
   it('copes with incomplete lines while typing', () => {

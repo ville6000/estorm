@@ -81,7 +81,9 @@ export function tokenize(line: string): Token[] {
       add('actor', start, colon);
       add('punct', colon, colon + 1);
       chain(colon + 1);
-    } else if (!/[()[\]{}]|->/.test(rest)) {
+    } else if (rest.includes('->')) {
+      chain(start);
+    } else if (!/[()[\]{}]/.test(rest)) {
       add('event', start, line.length);
     }
   }

@@ -49,6 +49,7 @@ OrderPlaced                      event on its own; a run of them
                                  is a timeline
 {Read model}                     informs the next step
 Actor: Command -> Event
+Command -> Event                 actor not known yet
 Actor: Command -> (Aggregate) -> [External] -> Event
   then Command -> Event           policy: reacts to the event above
   ! Question?                     hotspot, on the step above

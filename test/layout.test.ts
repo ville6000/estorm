@@ -26,6 +26,13 @@ describe('layout', () => {
     expect(right(command!)).toBeLessThan(agg!.x);
   });
 
+  it('starts a flow without an actor at its command', () => {
+    const { stickies, arrows } = board('{Cart}', 'Place order -> OrderPlaced');
+    expect(stickies.map((s) => s.kind)).toEqual(['read-model', 'command', 'event']);
+    expect(right(stickies[0]!)).toBe(stickies[1]!.x);
+    expect(arrows).toHaveLength(1);
+  });
+
   it('makes read model, policy and command touch', () => {
     const { stickies } = board('A: Do -> Done', '  {Info}', '  then B -> BDone');
     const [rm, policy, command] = stickies.slice(3);

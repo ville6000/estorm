@@ -19,7 +19,7 @@ Customer: Submit ticket -> (Ticket) -> TicketSubmitted
 | Syntax           | Sticky          | Colour      |
 |------------------|-----------------|-------------|
 | `Actor:`         | actor           | pale yellow |
-| text after `:` / `then` | command  | blue        |
+| first chain item | command         | blue        |
 | `then`           | policy          | lilac       |
 | `after … then`   | delayed policy (⏰) | lilac    |
 | `every …:`       | schedule (⏰)   | pale lilac  |
@@ -40,6 +40,13 @@ command.
 Actor: Command -> Event
 Actor: Command -> (Aggregate) -> Event
 Actor: Command -> [External] -> Event
+```
+
+The actor is optional, for when it isn't known yet; the row then starts at
+the command (or its read models).
+
+```
+Command -> Event
 ```
 
 **Reaction** — a policy reacts to the event of the nearest less-indented
@@ -156,7 +163,7 @@ blank      = { " " } ;
 comment    = indent , "#" , text ;
 hotspot    = indent , "!" , text ;
 read-model = indent , "{" , name , "}" ;
-flow       = name , ":" , name , chain ;
+flow       = [ name , ":" ] , name , chain ;
 reaction   = indent , "then" , " " , name , chain ;
 when       = "when" , " " , name ;
 after      = indent , "after" , " " , text , [ " unless " , name ] ;

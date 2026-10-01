@@ -26,12 +26,12 @@ interface Chain {
   event: string;
 }
 
-/** An actor (or a schedule) issues a command, producing an event. */
+/** An actor (or a schedule, or nobody yet) issues a command, producing an event. */
 export interface Flow extends Chain {
   type: 'flow';
   line: number;
   informedBy: ReadModel[];
-  /** Who issues the command. Absent for a schedule. */
+  /** Who issues the command. Absent for a schedule, or when not known yet. */
   actor?: string;
   /** When the command runs, e.g. "night at 02:00". Absent for an actor. */
   schedule?: string;
@@ -199,7 +199,10 @@ function classify(n: number, raw: string): Stmt | null {
     if (!NAME.test(actor)) fail(n, `invalid actor: ${actor}`);
     return { ...base, type: 'flow', actor, ...parseChain(n, m[2]!) };
   }
-  if (NAME.test(text) && !text.includes('->')) {
+  if (text.includes('->')) {
+    return { ...base, type: 'flow', ...parseChain(n, text) };
+  }
+  if (NAME.test(text)) {
     return { ...base, type: 'event', name: text };
   }
   return fail(n, 'unrecognised line');
