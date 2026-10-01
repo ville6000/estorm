@@ -1,5 +1,8 @@
 # estorm
 
+[![CI](https://github.com/ville6000/estorm/actions/workflows/ci.yml/badge.svg)](https://github.com/ville6000/estorm/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@villev/estorm)](https://www.npmjs.com/package/@villev/estorm)
+
 Event Storming boards as plain text. Write the flow in a few readable lines
 and get a board of stickies, rendered as SVG.
 
