@@ -7,12 +7,14 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { parseArgs } from 'node:util';
 import { ParseError, render } from './index.ts';
+import { serveStdio } from './lsp.ts';
 
 const USAGE = `Usage:
   estorm render <file.estorm>...         write <file>.svg next to each file
   estorm render <file.estorm> -o <out>   write to <out> ('-' for stdout)
   estorm check <file.estorm>...          report errors only
   estorm serve <file.estorm> [-p 8080]   live preview at http://localhost:8080
+  estorm lsp                             language server over stdio, for editors
 
 Options:
   -o, --out <file>    output file for a single input
@@ -159,6 +161,8 @@ async function main(argv: string[]): Promise<number> {
       port: { type: 'string', short: 'p', default: '8080' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
+      // Passed by some LSP clients; stdio is the only transport anyway.
+      stdio: { type: 'boolean' },
     },
   });
   if (values.help) {
@@ -180,6 +184,9 @@ async function main(argv: string[]): Promise<number> {
       if (!Number.isInteger(port)) throw new UsageError(`invalid port: ${values.port}`);
       return serve(files, port);
     }
+    case 'lsp':
+      serveStdio();
+      return new Promise(() => {});
     default:
       throw new UsageError(command ? `unknown command: ${command}` : 'missing command');
   }

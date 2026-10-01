@@ -71,6 +71,38 @@ npx estorm serve board.estorm           # live preview at http://localhost:8080
 
 Errors are reported as `file:line: message`, and the exit code is non-zero.
 
+### In your editor
+
+`estorm lsp` is a language server (stdio) for any editor that speaks LSP:
+it colours each part of a line like the sticky it becomes, shows parse
+errors as you type, and highlights every mention of the event under the
+cursor.
+
+Token types are named after the stickies: `actor`, `command`, `aggregate`,
+`external`, `event`, `readModel`, `schedule`, `hotspot` and `section`, plus
+the standard `comment`, `keyword` and `operator`. Most themes colour only
+the standard ones, so give the others colours yourself.
+
+Neovim 0.11 or later:
+
+```lua
+vim.filetype.add({ extension = { estorm = 'estorm' } })
+vim.lsp.config('estorm', { cmd = { 'npx', 'estorm', 'lsp' }, filetypes = { 'estorm' } })
+vim.lsp.enable('estorm')
+
+-- Colours like the browser editor's.
+for type, hl in pairs({
+  command = { fg = '#1864ab' },
+  event = { fg = '#a33b0b', bg = '#ffe8cc' },
+  schedule = { fg = '#6741d9' },
+  external = { italic = true },
+  hotspot = { fg = '#c92a2a' },
+  section = { bold = true },
+}) do
+  vim.api.nvim_set_hl(0, '@lsp.type.' .. type .. '.estorm', hl)
+end
+```
+
 ### In Docker or CI
 
 ```sh

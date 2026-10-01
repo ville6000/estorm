@@ -1,10 +1,10 @@
 /**
- * Syntax highlighting for the editor: splits one line of estorm source into
+ * Syntax highlighting for editors: splits one line of estorm source into
  * tokens. Sticky tokens are named after the sticky they become on the board,
  * so the editor can colour them the same way. Works line by line, like the
  * parser, and never fails: text it doesn't recognise is left plain.
  */
-import type { Kind } from '../src/layout.ts';
+import type { Kind } from './layout.ts';
 
 export type TokenKind = Kind | 'comment' | 'section' | 'keyword' | 'arrow' | 'punct';
 export interface Token {

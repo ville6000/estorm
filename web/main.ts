@@ -18,7 +18,7 @@ import {
 import { defaultKeymap, history, historyKeymap, insertNewlineKeepIndent } from '@codemirror/commands';
 import { vim, Vim } from '@replit/codemirror-vim';
 import { layout, parse, ParseError, svg } from '../src/index.ts';
-import { tokenize } from './highlight.ts';
+import { tokenize } from '../src/highlight.ts';
 
 // File System Access API: Chromium only, so feature-detected.
 interface FileHandle {
