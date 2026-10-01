@@ -39,6 +39,18 @@ describe('cli', () => {
     expect(stderr.trim()).toBe('nope.estorm: no such file');
   });
 
+  it('reports directories', () => {
+    const { status, stderr } = run('check', 'examples');
+    expect(status).toBe(1);
+    expect(stderr.trim()).toBe('examples: is a directory');
+  });
+
+  it('rejects ports out of range', () => {
+    const { status, stderr } = run('serve', 'examples/hotel.estorm', '-p', '70000');
+    expect(status).toBe(2);
+    expect(stderr).toContain('invalid port: 70000');
+  });
+
   it('explains usage errors', () => {
     const { status, stderr } = run('frobnicate');
     expect(status).toBe(2);

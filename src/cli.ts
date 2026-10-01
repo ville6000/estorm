@@ -26,13 +26,20 @@ class UsageError extends Error {}
 
 type Result = { svg: string } | { error: string };
 
+const READ_ERRORS: Record<string, string> = {
+  ENOENT: 'no such file',
+  EISDIR: 'is a directory',
+  EACCES: 'permission denied',
+};
+
 /** The SVG for FILE, or its first error as "file:line: message". */
 function compile(file: string): Result {
   let text: string;
   try {
     text = readFileSync(file, 'utf8');
-  } catch {
-    return { error: `${file}: no such file` };
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    return { error: `${file}: ${READ_ERRORS[code ?? ''] ?? 'cannot read file'}` };
   }
   try {
     return { svg: render(text) };
@@ -181,7 +188,7 @@ async function main(argv: string[]): Promise<number> {
       return check(files);
     case 'serve': {
       const port = Number(values.port);
-      if (!Number.isInteger(port)) throw new UsageError(`invalid port: ${values.port}`);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) throw new UsageError(`invalid port: ${values.port}`);
       return serve(files, port);
     }
     case 'lsp':
