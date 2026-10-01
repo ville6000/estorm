@@ -1,0 +1,35 @@
+# Web shop: from checkout to shipping
+# Shows sections (bounded contexts), 'when', 'after ... unless' and 'every'.
+
+== Sales ==
+! Do we support guest checkout?
+{Shopping cart}
+Customer: Place order -> (Order) -> OrderPlaced
+  after 30 minutes unless PaymentCaptured
+    then Cancel unpaid order -> (Order) -> OrderCancelled
+
+Customer: Cancel order -> (Order) -> OrderCancelled
+  ! Can an order be cancelled after it is packed?
+
+when PaymentCaptured
+  then Confirm order -> (Order) -> OrderConfirmed
+    then Send confirmation email -> [Email service] -> ConfirmationEmailSent
+
+== Payments ==
+when OrderPlaced
+  then Charge card -> [Payment provider] -> PaymentCaptured
+  ! What if the charge succeeds but our callback times out?
+
+when OrderCancelled
+  then Refund payment -> [Payment provider] -> PaymentRefunded
+  ! Nothing to refund if the order was never paid
+
+== Warehouse ==
+when OrderConfirmed
+  then Reserve stock -> (Inventory) -> StockReserved
+
+{Orders to pack}
+Warehouse worker: Pack order -> (Shipment) -> OrderPacked
+  then Book pickup -> [Carrier] -> PickupBooked
+
+every night at 02:00: Reorder low stock -> (Inventory) -> [Supplier] -> StockReordered

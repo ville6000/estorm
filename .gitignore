@@ -1,12 +1,10 @@
-# Clojure tooling
-.cpcache/
-.nrepl-port
-.lsp/.cache/
-.clj-kondo/.cache/
-.clj-kondo/imports/
-.calva/
-.portal/
-target/
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Your own boards; never committed
+local/
 
 # OS / editors
 .DS_Store

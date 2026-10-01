@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>estorm</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <strong class="brand">estorm</strong>
+      <span id="file-name" class="file-name">untitled.estorm</span>
+      <div class="actions">
+        <button id="new" type="button" title="New board">New</button>
+        <button id="open" type="button" title="Open a .estorm file (Ctrl/⌘+O)">Open…</button>
+        <button id="save" type="button" title="Save (Ctrl/⌘+S)">Save</button>
+        <button id="save-as" type="button" title="Save as a new file">Save as…</button>
+        <button id="export" type="button" title="Download the board as SVG">Export SVG</button>
+        <select id="examples" title="Load an example">
+          <option value="">Examples…</option>
+        </select>
+        <button id="help" type="button" aria-expanded="false" aria-controls="cheatsheet">Syntax</button>
+      </div>
+      <div class="zoom" role="group" aria-label="Zoom">
+        <button id="zoom-out" type="button" title="Zoom out">−</button>
+        <button id="zoom-reset" type="button" title="Reset zoom">100%</button>
+        <button id="zoom-in" type="button" title="Zoom in">+</button>
+        <button id="zoom-fit" type="button" title="Fit to width">Fit</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="editor-pane" aria-label="Editor">
+        <div class="editor">
+          <pre id="gutter" class="gutter" aria-hidden="true"></pre>
+          <textarea id="source" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="estorm source"></textarea>
+        </div>
+        <button id="error" class="error" type="button" hidden></button>
+      </section>
+
+      <section class="preview-pane" aria-label="Board">
+        <div id="board" class="board"></div>
+      </section>
+
+      <aside id="cheatsheet" class="cheatsheet" hidden>
+        <h2>Syntax</h2>
+        <pre>
+# comment
+== Context ==                    section, drawn as a lane
+{Read model}                     informs the next step
+Actor: Command -> Event
+Actor: Command -> (Aggregate) -> [External] -> Event
+  then Command -> Event           policy: reacts to the event above
+  ! Question?                     hotspot, on the step above
+  after 30 days unless Event      delays the reactions below
+    then Command -> Event
+when Event                        reacts to an event by name,
+  then Command -> Event           e.g. from another section
+every night at 02:00: Command -> Event
+</pre>
+        <p>Indent with 2 spaces. Click a sticky to jump to its line.</p>
+        <p><a href="https://github.com/ville6000/estorm/blob/main/GRAMMAR.md" target="_blank" rel="noopener">Full grammar</a></p>
+      </aside>
+    </main>
+
+    <input id="file-input" type="file" accept=".estorm,.txt,text/plain" hidden />
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

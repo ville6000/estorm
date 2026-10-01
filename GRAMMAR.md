@@ -28,13 +28,13 @@ Customer: Submit ticket -> (Ticket) -> TicketSubmitted
 | `{Name}`         | read model      | green       |
 | last chain item  | event           | orange      |
 | `! text`         | hotspot         | red         |
-| `== Name ==`     | section (lane)  | grey band   |
+| `== Name ==`     | section (lane)  | white lane, grey gap |
 
 ## Statements
 
 **Flow** — an actor issues a command, producing an event. Read models, the
 actor (or policy) and the command touch, as one group; arrows start at the
-command. Lanes are separated by a grey gap.
+command.
 
 ```
 Actor: Command -> Event
@@ -159,74 +159,87 @@ name       = text without "->" "(" ")" "[" "]" "{" "}" ":" ;
 text       = any characters up to end of line ;
 ```
 
-## Target AST
+## AST
 
-Line numbers are 1-based and kept for error messages and later editor features.
-For the example above:
+`parse()` returns the top-level items in source order. Line numbers are
+1-based, for error messages and editor features (clicking a sticky jumps to
+its line). See `src/parser.ts` for the types. For the example above:
 
-```clojure
-[{:type :flow :line 3
-  :informed-by [{:type :read-model :name "Ticket form with topic list" :line 2}]
-  :actor "Customer"
-  :command "Submit ticket"
-  :via [{:type :aggregate :name "Ticket"}]
-  :event "TicketSubmitted"
-  :reactions
-  [{:type :reaction :line 4
-    :informed-by []
-    :command "Fetch customer details"
-    :via [{:type :external :name "CRM"}]
-    :event "CustomerDetailsFetched"
-    :hotspots []
-    :reactions []}
-   {:type :reaction :line 6
-    :informed-by [{:type :read-model :name "Department topic mapping" :line 5}]
-    :command "Assign by topic"
-    :via [{:type :aggregate :name "Ticket"}]
-    :event "TicketAssigned"
-    :hotspots [{:type :hotspot :text "Who owns the topic → department mapping?" :line 7}]
-    :reactions []}]
-  :hotspots []}]
+```json
+[
+  {
+    "type": "flow",
+    "line": 3,
+    "informedBy": [{ "type": "read-model", "name": "Ticket form with topic list", "line": 2 }],
+    "actor": "Customer",
+    "command": "Submit ticket",
+    "via": [{ "type": "aggregate", "name": "Ticket" }],
+    "event": "TicketSubmitted",
+    "hotspots": [],
+    "reactions": [
+      {
+        "type": "reaction",
+        "line": 4,
+        "informedBy": [],
+        "command": "Fetch customer details",
+        "via": [{ "type": "external", "name": "CRM" }],
+        "event": "CustomerDetailsFetched",
+        "hotspots": [],
+        "reactions": []
+      },
+      {
+        "type": "reaction",
+        "line": 6,
+        "informedBy": [{ "type": "read-model", "name": "Department topic mapping", "line": 5 }],
+        "command": "Assign by topic",
+        "via": [{ "type": "aggregate", "name": "Ticket" }],
+        "event": "TicketAssigned",
+        "hotspots": [{ "type": "hotspot", "text": "Who owns the topic → department mapping?", "line": 7 }],
+        "reactions": []
+      }
+    ]
+  }
+]
 ```
 
-Read models are moved into `:informed-by` of the statement they precede.
+Read models are moved into `informedBy` of the statement they precede.
 A read model with no following flow or reaction is an error.
 
-Hotspots go into `:hotspots` of the flow or reaction that caused them. Board
+Hotspots go into `hotspots` of the flow or reaction that caused them. Board
 and section hotspots are top-level, in source order with the flows.
 
-An `after` sits in its parent's `:reactions`, holding the reactions it
-delays. A schedule is a flow with `:schedule` instead of `:actor`:
+An `after` sits in its parent's `reactions`, holding the reactions it
+delays. A schedule is a flow with `schedule` instead of `actor`:
 
-```clojure
-{:type :after :line 10 :duration "30 days" :unless "CustomerFollowedUp"
- :hotspots [] :reactions [{:type :reaction :line 11 ...}]}
-{:type :flow :line 19 :schedule "night at 02:00" :command "Archive tickets" ...}
+```json
+{ "type": "after", "line": 10, "duration": "30 days", "unless": "CustomerFollowedUp", "reactions": [ ... ] }
+{ "type": "flow", "line": 19, "schedule": "night at 02:00", "command": "Archive tickets", ... }
 ```
 
 Sections are top-level markers; an item belongs to the nearest section above.
 A `when` takes its reactions:
 
-```clojure
-[{:type :section :name "Sales" :line 1}
- {:type :flow :line 2 ... :event "OrderPlaced"}
- {:type :section :name "Billing" :line 3}
- {:type :when :line 4 :event "OrderPlaced" :hotspots []
-  :reactions [{:type :reaction :line 5 ...}]}]
+```json
+[
+  { "type": "section", "name": "Sales", "line": 1 },
+  { "type": "flow", "line": 2, "event": "OrderPlaced", ... },
+  { "type": "section", "name": "Billing", "line": 3 },
+  { "type": "when", "line": 4, "event": "OrderPlaced", "reactions": [ ... ] }
+]
 ```
 
 ## Errors
 
 Report as `<file>:<line>: <message>`, e.g.
 
-- `tickets.estorm:4: 'then' has no parent flow`
-- `tickets.estorm:7: chain must end with an event, got [CRM]`
-- `tickets.estorm:9: tab in indentation`
-- `tickets.estorm:12: read model {Backlog} informs nothing`
-- `tickets.estorm:3: unrecognised line`
-- `tickets.estorm:20: 'when' refers to unknown event TicketSubmited`
-- `tickets.estorm:20: 'when' has no reactions`
-- `tickets.estorm:10: 'unless' refers to unknown event CustomerFolowedUp`
+- `board.estorm:4: 'then' has no parent flow`
+- `board.estorm:7: chain must end with an event, got [CRM]`
+- `board.estorm:9: tab in indentation`
+- `board.estorm:12: read model {Backlog} informs nothing`
+- `board.estorm:3: unrecognised line`
+- `board.estorm:20: 'when' refers to unknown event TicketSubmited`
+- `board.estorm:20: 'when' has no reactions`
+- `board.estorm:10: 'unless' refers to unknown event CustomerFolowedUp`
 
 ## Open questions
 

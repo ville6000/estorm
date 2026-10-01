@@ -1,0 +1,52 @@
+{
+  "name": "estorm",
+  "version": "0.1.0",
+  "description": "A plain-text notation for Event Storming boards, rendered to SVG",
+  "keywords": [
+    "event-storming",
+    "ddd",
+    "domain-driven-design",
+    "diagram",
+    "svg"
+  ],
+  "license": "MIT",
+  "author": "Ville Viklund",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ville6000/estorm.git"
+  },
+  "type": "module",
+  "bin": {
+    "estorm": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "GRAMMAR.md"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.build.json && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test",
+    "estorm": "node src/cli.ts",
+    "examples": "node scripts/render-examples.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^5.0.3"
+  }
+}

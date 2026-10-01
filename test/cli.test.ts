@@ -1,0 +1,53 @@
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+const run = (...args: string[]) => spawnSync('node', ['src/cli.ts', ...args], { encoding: 'utf8' });
+
+function fixture(text: string): string {
+  const file = join(mkdtempSync(join(tmpdir(), 'estorm-')), 'board.estorm');
+  writeFileSync(file, text);
+  return file;
+}
+
+describe('cli', () => {
+  it('renders next to the input', () => {
+    const file = fixture('A: Do -> Done');
+    const { status } = run('render', file);
+    expect(status).toBe(0);
+    expect(readFileSync(file.replace(/\.estorm$/, '.svg'), 'utf8')).toMatch(/^<svg/);
+  });
+
+  it('renders to stdout', () => {
+    const { status, stdout } = run('render', fixture('A: Do -> Done'), '-o', '-');
+    expect(status).toBe(0);
+    expect(stdout).toMatch(/^<svg/);
+  });
+
+  it('reports errors as file:line: message', () => {
+    const file = fixture('A: Do -> Done\n  then Oops');
+    const { status, stderr } = run('check', file);
+    expect(status).toBe(1);
+    expect(stderr.trim()).toBe(`${file}:2: chain must end with an event`);
+  });
+
+  it('reports missing files', () => {
+    const { status, stderr } = run('check', 'nope.estorm');
+    expect(status).toBe(1);
+    expect(stderr.trim()).toBe('nope.estorm: no such file');
+  });
+
+  it('explains usage errors', () => {
+    const { status, stderr } = run('frobnicate');
+    expect(status).toBe(2);
+    expect(stderr).toContain('unknown command: frobnicate');
+    expect(stderr).toContain('Usage:');
+  });
+
+  it('prints the version', () => {
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+    expect(run('--version').stdout.trim()).toBe(pkg.version);
+  });
+});
