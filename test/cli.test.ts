@@ -1,13 +1,17 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 const run = (...args: string[]) => spawnSync('node', ['src/cli.ts', ...args], { encoding: 'utf8' });
 
+const dir = mkdtempSync(join(tmpdir(), 'estorm-'));
+afterAll(() => rmSync(dir, { recursive: true }));
+
+let fixtures = 0;
 function fixture(text: string): string {
-  const file = join(mkdtempSync(join(tmpdir(), 'estorm-')), 'board.estorm');
+  const file = join(dir, `board-${++fixtures}.estorm`);
   writeFileSync(file, text);
   return file;
 }
