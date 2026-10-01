@@ -55,8 +55,8 @@ flow or reaction above it, and issues a command. The policy sticky is labelled
 after the parent's event, unless the `unless` event happens first. Like a
 `then`, it is one level deeper than its parent (a flow, reaction or `when`),
 and its reactions one level deeper still. DURATION is free text. The
-`unless` event must be produced somewhere in the file; a red dotted arrow
-links it to the delayed policies.
+`unless …` part is optional. When given, its event must be produced
+somewhere in the file; a red dotted arrow links it to the delayed policies.
 
 ```
   after 30 days unless CustomerFollowedUp
@@ -230,16 +230,44 @@ A `when` takes its reactions:
 
 ## Errors
 
-Report as `<file>:<line>: <message>`, e.g.
+Reported as `<file>:<line>: <message>`, e.g.
+`board.estorm:4: 'then' has no parent flow`. Parsing stops at the first
+error. The messages:
 
-- `board.estorm:4: 'then' has no parent flow`
-- `board.estorm:7: chain must end with an event, got [CRM]`
-- `board.estorm:9: tab in indentation`
-- `board.estorm:12: read model {Backlog} informs nothing`
-- `board.estorm:3: unrecognised line`
-- `board.estorm:20: 'when' refers to unknown event TicketSubmited`
-- `board.estorm:20: 'when' has no reactions`
-- `board.estorm:10: 'unless' refers to unknown event CustomerFolowedUp`
+Lines
+
+- `unrecognised line`
+- `invalid actor: A(x)`
+- `empty hotspot`
+- `empty section name`
+
+Indentation
+
+- `tab in indentation`
+- `indentation must be a multiple of 2 spaces`
+- `flow must not be indented` (also for schedules)
+- `'when' must not be indented`
+- `section must not be indented`
+- `'then' has no parent flow` (also `'after'`)
+- `'then' must be one level deeper than its parent` (also `'after'`)
+
+Chains
+
+- `chain must end with an event`
+- `chain must end with an event, got [CRM]`
+- `expected a command, got (Ticket)`
+- `expected (Aggregate) or [External], got TicketSubmitted`
+- `empty item in chain`
+- `invalid item: {Backlog}`
+
+Structure
+
+- `read model {Backlog} informs nothing`
+- `hotspot must follow a flow or reaction, not 'when'` (also `'after'`)
+- `'when' has no reactions` (also `'after'`)
+- `'when' expects an event name, got (Ticket)` (also `'unless'`)
+- `'when' refers to unknown event TicketSubmited`
+- `'unless' refers to unknown event CustomerFolowedUp`
 
 ## Open questions
 
