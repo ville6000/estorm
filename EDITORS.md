@@ -53,3 +53,10 @@ vim.api.nvim_create_autocmd({ 'CursorMoved', 'CursorMovedI' }, {
 They use the `LspReferenceText` highlight group. `CursorHold` fires after
 `updatetime` milliseconds, 4000 by default; `vim.o.updatetime = 250` makes
 it feel immediate.
+
+## Other editors
+
+Any editor with an LSP client can run the server: start
+`npx @villev/estorm lsp` (or `estorm lsp` when installed) for files ending
+in `.estorm`, talking over stdio. The colours need a client that supports
+semantic tokens.
