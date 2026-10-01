@@ -19,6 +19,7 @@
         <select id="examples" title="Load an example">
           <option value="">Examples…</option>
         </select>
+        <button id="vim" type="button" aria-pressed="false" title="Toggle vim keybindings (:w saves)">Vim</button>
         <button id="help" type="button" aria-expanded="false" aria-controls="cheatsheet">Syntax</button>
       </div>
       <div class="zoom" role="group" aria-label="Zoom">
@@ -31,10 +32,7 @@
 
     <main class="workspace">
       <section class="editor-pane" aria-label="Editor">
-        <div class="editor">
-          <pre id="gutter" class="gutter" aria-hidden="true"></pre>
-          <textarea id="source" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="estorm source"></textarea>
-        </div>
+        <div id="source" class="editor"></div>
         <button id="error" class="error" type="button" hidden></button>
       </section>
 

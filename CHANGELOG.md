@@ -7,6 +7,8 @@ project follows [Semantic Versioning](https://semver.org/).
 ## Unreleased
 
 - The editor is published to GitHub Pages on each release.
+- The editor uses CodeMirror and has optional vim keybindings (toggle with
+  the Vim button; `:w` saves).
 
 ## 0.1.0
 
