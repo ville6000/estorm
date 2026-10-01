@@ -61,13 +61,12 @@ diff before committing them.
 ## Pull requests
 
 - Keep each pull request to one change, with tests.
-- Add a line to CHANGELOG.md under "Unreleased".
 - `npm run check` must pass.
 
 ## Releasing
 
-1. Move the "Unreleased" entries in CHANGELOG.md under the new version.
-2. Bump `version` in package.json.
-3. Tag `vX.Y.Z` and push the tag. The release workflow builds and attaches
-   `estorm.html`, and the Pages workflow publishes it to
-   <https://ville6000.github.io/estorm/>.
+1. Bump `version` in package.json.
+2. Tag `vX.Y.Z` and push the tag. The release workflow builds and attaches
+   `estorm.html` to a GitHub release with generated notes, and the Pages
+   workflow publishes it to <https://ville6000.github.io/estorm/>.
+3. Edit the release notes on GitHub if needed; they are the changelog.
