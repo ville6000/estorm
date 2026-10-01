@@ -1,5 +1,5 @@
 /** Renders a layout (see layout.ts) as a standalone SVG document. */
-import { LANE_PAD } from './layout.ts';
+import { LANE_LABEL_H, LANE_PAD } from './layout.ts';
 import type { Kind, Lane, Layout, Path, Rect, Sticky } from './layout.ts';
 
 export const COLORS: Record<Kind, string> = {
@@ -144,7 +144,7 @@ function lane({ name, line, x, y }: Lane): string {
   return el('g', { class: 'lane', 'data-line': line }, [
     el(
       'text',
-      { x: x + LANE_PAD, y: y + 36, 'font-size': 15, 'font-weight': 'bold', fill: '#495057' },
+      { x: x + LANE_PAD, y: y + LANE_LABEL_H, 'font-size': 15, 'font-weight': 'bold', fill: '#495057' },
       escape(name),
     ),
   ]);
