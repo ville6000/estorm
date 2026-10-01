@@ -1,13 +1,17 @@
 name: Release
 
-# Push a tag like v0.2.0 (matching package.json) to publish estorm.html as a
-# GitHub release asset.
+# Push a tag like v0.2.0 (matching package.json), with `npm version`, to
+# publish the package to npm and estorm.html as a GitHub release asset.
+#
+# npm publishing uses trusted publishing (OIDC), so there is no token: the
+# package's settings on npmjs.com trust this workflow in ville6000/estorm.
 on:
   push:
     tags: ['v*']
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
@@ -18,12 +22,15 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+          registry-url: https://registry.npmjs.org
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
       - name: Check the tag matches package.json
         run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - name: Publish to npm
+        run: npm publish --provenance
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
