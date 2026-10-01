@@ -41,7 +41,9 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test",
     "estorm": "node src/cli.ts",
-    "examples": "node scripts/render-examples.ts"
+    "examples": "node scripts/render-examples.ts",
+    "preversion": "npm run check",
+    "postversion": "git push --follow-tags"
   },
   "devDependencies": {
     "@codemirror/commands": "^6.11.1",
