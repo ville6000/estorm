@@ -1,6 +1,6 @@
 /**
- * A language server for .estorm files, for editors such as Neovim, Rider and
- * VS Code. Speaks the Language Server Protocol over stdio and provides:
+ * A language server for .estorm files, for any editor with an LSP client.
+ * Speaks the Language Server Protocol over stdio and provides:
  *
  *   semantic tokens     colours, named after the sticky each token becomes
  *   diagnostics         parse errors, on the offending line

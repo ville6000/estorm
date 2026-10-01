@@ -11,6 +11,8 @@
   ],
   "license": "MIT",
   "author": "Ville Viklund",
+  "homepage": "https://ville6000.github.io/estorm/",
+  "bugs": "https://github.com/ville6000/estorm/issues",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ville6000/estorm.git"
