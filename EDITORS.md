@@ -16,7 +16,7 @@ Neovim 0.11 or later:
 
 ```lua
 vim.filetype.add({ extension = { estorm = 'estorm' } })
-vim.lsp.config('estorm', { cmd = { 'npx', 'estorm', 'lsp' }, filetypes = { 'estorm' } })
+vim.lsp.config('estorm', { cmd = { 'npx', '@villev/estorm', 'lsp' }, filetypes = { 'estorm' } })
 vim.lsp.enable('estorm')
 
 -- Colours like the browser editor's.

@@ -62,11 +62,11 @@ intranet page or a file share.
 Requires Node.js 22.18 or later.
 
 ```sh
-npx estorm render board.estorm          # writes board.svg
-npx estorm render docs/*.estorm         # one SVG next to each file
-npx estorm render board.estorm -o -     # SVG to stdout
-npx estorm check docs/*.estorm          # errors only, for CI
-npx estorm serve board.estorm           # live preview at http://localhost:8080
+npx @villev/estorm render board.estorm        # writes board.svg
+npx @villev/estorm render docs/*.estorm       # one SVG next to each file
+npx @villev/estorm render board.estorm -o -   # SVG to stdout
+npx @villev/estorm check docs/*.estorm        # errors only, for CI
+npx @villev/estorm serve board.estorm         # live preview at http://localhost:8080
 ```
 
 Errors are reported as `file:line: message`, and the exit code is non-zero.
@@ -96,7 +96,7 @@ boards:
 ### In your own code
 
 ```ts
-import { parse, layout, svg, render, ParseError } from 'estorm';
+import { parse, layout, svg, render, ParseError } from '@villev/estorm';
 
 const doc = render(text); // parse -> layout -> svg
 ```
