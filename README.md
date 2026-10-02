@@ -25,6 +25,20 @@ Because boards are text, they live in your repository next to the code.
 Changes go through review like any other change, show up as readable diffs,
 and never go stale on a whiteboard photo.
 
+## Which one do you need?
+
+| You want to…                                   | Use                               | Install                       |
+| ---------------------------------------------- | --------------------------------- | ----------------------------- |
+| Draw a board, alone or in a workshop           | [Browser editor](#browser-editor) | Nothing: download one file    |
+| Render, check or lint boards from the terminal | [Command line](#command-line)     | `npm install -g`, Node.js 22+ |
+| Write boards in Neovim or another LSP editor   | [Editor support](#editor-support) | The command line              |
+| Render boards in CI                            | [Docker and CI](#docker-and-ci)   | Docker                        |
+| Render boards from JavaScript or TypeScript    | [Library](#library)               | `npm install`                 |
+
+Everything works offline once installed: the browser editor makes no
+network requests, and the command line and library have no runtime
+dependencies.
+
 ## Notation at a glance
 
 | Syntax                                   | Sticky                                                  |
@@ -45,35 +59,45 @@ and never go stale on a whiteboard photo.
 The full notation, with every rule and error message, is in
 [GRAMMAR.md](GRAMMAR.md). More examples are in [examples/](examples/).
 
-## Use it
+## Browser editor
 
-### In the browser: nothing to install
+For drawing boards. Edit on the left, see the board on the right, click a
+sticky to jump to its line, open and save `.estorm` files, export SVG,
+and open a summary of lint warnings, actors, aggregates, context
+dependencies, gaps and hotspots.
 
-Download `estorm.html` from the
+**Try it:** <https://ville6000.github.io/estorm/>, updated on each release.
+
+**Install:** download `estorm.html` from the
 [latest release](https://github.com/ville6000/estorm/releases/latest) and
-open it. It is a single self-contained file that works offline: edit on the
-left, see the board on the right, click a sticky to jump to its line, open
-and save `.estorm` files, export SVG or PNG, and open a summary of lint
-warnings, actors, aggregates, context dependencies, gaps and hotspots.
+open it in a browser. It is a single self-contained file, so no server is
+needed, and it works offline. Drafts are kept in the browser's local
+storage.
 
-It is also hosted at <https://ville6000.github.io/estorm/>, updated on
-each release.
+**Share with a team:** put the file on any static web server, an intranet
+page or a file share.
 
-To share it with your teams, put the file on any static web server, an
-intranet page or a file share.
+## Command line
 
-### On the command line
+For rendering boards to SVG and checking them, locally or in scripts.
 
-Requires Node.js 22.18 or later.
+**Install:** requires Node.js 22.18 or later. Install once while online;
+it then works offline:
 
 ```sh
-npx @villev/estorm render board.estorm        # writes board.svg
-npx @villev/estorm render docs/*.estorm       # one SVG next to each file
-npx @villev/estorm render board.estorm -o -   # SVG to stdout
-npx @villev/estorm check docs/*.estorm        # errors only, for CI
-npx @villev/estorm lint docs/*.estorm         # errors and modelling warnings
-npx @villev/estorm summary board.estorm       # actors, aggregates, gaps, hotspots
-npx @villev/estorm serve board.estorm         # live preview at http://localhost:8080
+npm install -g @villev/estorm
+```
+
+**Use:**
+
+```sh
+estorm render board.estorm        # writes board.svg
+estorm render docs/*.estorm       # one SVG next to each file
+estorm render board.estorm -o -   # SVG to stdout
+estorm check docs/*.estorm        # errors only, for CI
+estorm lint docs/*.estorm         # errors and modelling warnings
+estorm summary board.estorm       # actors, aggregates, gaps, hotspots
+estorm serve board.estorm         # live preview at http://localhost:8080
 ```
 
 Errors are reported as `file:line: message`, and the exit code is non-zero.
@@ -81,14 +105,26 @@ Errors are reported as `file:line: message`, and the exit code is non-zero.
 used in more than one bounded context; see
 [GRAMMAR.md](GRAMMAR.md#warnings).
 
-### In your editor
+To pin a version per project, use `npm install -D @villev/estorm` and run
+`npx estorm`. Running `npx @villev/estorm` without installing also works,
+but downloads the package and so needs a connection.
 
-`estorm lsp` is a language server for any editor that speaks LSP: sticky
-colours, parse errors and lint warnings as you type, highlights for the
-event under the cursor, and completion of keywords and of the events,
-aggregates, externals and actors already on the board. Setup for Neovim is in [EDITORS.md](EDITORS.md).
+## Editor support
 
-### In Docker or CI
+For writing boards in your code editor: sticky colours, parse errors and
+lint warnings as you type, highlights for the event under the cursor, and
+completion of keywords and of the events, aggregates, externals and actors
+already on the board.
+
+**Install:** install the [command line](#command-line); it includes the
+language server, `estorm lsp`, for any editor that speaks LSP. Setup for
+Neovim is in [EDITORS.md](EDITORS.md).
+
+## Docker and CI
+
+For rendering boards in a pipeline without installing Node.js.
+
+**Install:** build the image from this repository:
 
 ```sh
 docker build -t estorm .
@@ -104,7 +140,25 @@ boards:
   artifacts: { paths: ['**/*.svg'] }
 ```
 
-### In your own code
+**Offline:** push the image to your internal registry, or save it to a file
+and load it on the offline machine:
+
+```sh
+docker save estorm -o estorm.tar   # online
+docker load -i estorm.tar          # offline
+```
+
+## Library
+
+For rendering boards from your own code.
+
+**Install:**
+
+```sh
+npm install @villev/estorm
+```
+
+**Use:**
 
 ```ts
 import { parse, layout, svg, render, summarize, lint, ParseError } from '@villev/estorm';
@@ -113,52 +167,6 @@ const doc = render(text); // parse -> layout -> svg
 const prose = summarize(parse(text)); // Markdown overview
 const warnings = lint(parse(text)); // [{ line, message }]
 ```
-
-## Running it without internet access
-
-estorm makes no network requests at runtime: the editor is one HTML file
-with everything inlined, and the CLI has no runtime dependencies. Fetch the
-pieces once on a machine with internet access, then move them across.
-
-### Editor
-
-1. Download `estorm.html` from the
-   [latest release](https://github.com/ville6000/estorm/releases/latest).
-2. Copy it to the offline machine and open it in a browser. No server is
-   needed; drafts are kept in the browser's local storage.
-3. To share it with a team, put the same file on an internal web server or
-   file share.
-
-### CLI
-
-Requires Node.js 22.18 or later. Install it once while online; it then
-works offline, as it has no runtime dependencies:
-
-```sh
-npm install -g @villev/estorm   # online, once
-estorm render board.estorm      # works offline from then on
-```
-
-In a project, `npm install -D @villev/estorm` works the same way:
-`npx estorm` then runs the installed copy without the network. Plain
-`npx @villev/estorm` without installing first needs a connection.
-
-### Docker
-
-1. Online, build the image and save it to a file:
-
-   ```sh
-   docker build -t estorm .
-   docker save estorm -o estorm.tar
-   ```
-
-2. Copy `estorm.tar` across, then load it, or push it to your internal
-   registry for CI:
-
-   ```sh
-   docker load -i estorm.tar
-   docker run --rm -v "$PWD:/work" estorm render board.estorm
-   ```
 
 ## Development
 
