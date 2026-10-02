@@ -2,8 +2,9 @@
 
 `estorm lsp` is a language server (stdio) for any editor that speaks LSP:
 it colours each part of a line like the sticky it becomes, shows parse
-errors as you type, and highlights every mention of the event under the
-cursor.
+errors as you type, highlights every mention of the event under the
+cursor, and completes keywords and the events, aggregates, externals and
+actors already on the board.
 
 Token types are named after the stickies: `actor`, `command`, `aggregate`,
 `external`, `event`, `readModel`, `schedule`, `hotspot`, `rule` and `section`, plus

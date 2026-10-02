@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
-import { createServer, diagnostics, eventHighlights, semanticTokens, TOKEN_TYPES } from '../src/lsp.ts';
+import { completions, createServer, diagnostics, eventHighlights, semanticTokens, TOKEN_TYPES } from '../src/lsp.ts';
 
 /** Decodes semantic tokens back to [line, text, type] for readable expectations. */
 function decode(text: string): [number, string, string][] {
@@ -96,6 +96,57 @@ describe('eventHighlights', () => {
 
   it('is empty off an event', () => {
     expect(eventHighlights(text, { line: 0, character: 3 })).toEqual([]);
+  });
+});
+
+describe('completions', () => {
+  const board = 'Customer: Place order -> (Order) -> Order placed\n  then Charge -> [Stripe] -> Card charged\n';
+  /** Completes at the end of LINE, appended to the board; returns [label, newText, range start]. */
+  const at = (line: string, after = '') =>
+    completions(board + line + after, { line: 2, character: line.length }).map((c) => [
+      c.label,
+      c.textEdit.newText,
+      c.textEdit.range.start.character,
+    ]);
+
+  it('offers events after when, unless and arrows, replacing the whole name', () => {
+    const events = [
+      ['Order placed', 'Order placed', 5],
+      ['Card charged', 'Card charged', 5],
+    ];
+    expect(at('when Order p')).toEqual(events);
+    expect(at('  after 1 day unless ').map(([l]) => l)).toEqual(['Order placed', 'Card charged']);
+    expect(at('  then Refund -> ').map(([l]) => l)).toEqual(['Order placed', 'Card charged']);
+  });
+
+  it('offers aggregates and externals in their brackets, eating an auto-closed bracket', () => {
+    expect(at('A: Do -> (Or')).toEqual([['Order', '(Order)', 9]]);
+    expect(at('A: Do -> [', ']')).toEqual([['Stripe', '[Stripe]', 9]]);
+    const [item] = completions(board + 'A: Do -> (O)', { line: 2, character: 11 });
+    expect(item!.textEdit.range.end.character).toBe(12);
+  });
+
+  it('offers keywords, actors and events at the start of a line', () => {
+    expect(at('  ').map(([, t]) => t)).toEqual([
+      'when ',
+      'then ',
+      'after ',
+      'every ',
+      'Customer: ',
+      'Order placed',
+      'Card charged',
+    ]);
+  });
+
+  it('offers nothing for commands, schedules or comments', () => {
+    expect(at('  then ')).toEqual([]);
+    expect(at('Customer: ')).toEqual([]);
+    expect(at('every ')).toEqual([]);
+    expect(at('# Or')).toEqual([]);
+  });
+
+  it('does not offer the name being typed', () => {
+    expect(completions('when Ord', { line: 0, character: 8 })).toEqual([]);
   });
 });
 
