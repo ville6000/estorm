@@ -116,14 +116,49 @@ const warnings = lint(parse(text)); // [{ line, message }]
 
 ## Running it without internet access
 
-Everything estorm needs at runtime is in the repository: the browser editor
-is one HTML file with no external requests, and the CLI has no runtime
-dependencies. To use it in an offline or on-premises environment:
+estorm makes no network requests at runtime: the editor is one HTML file
+with everything inlined, and the CLI has no runtime dependencies. Fetch the
+pieces once on a machine with internet access, then move them across.
 
-- **Editor:** host `estorm.html` on an internal web server or file share.
-- **CI:** build the Docker image and push it to your internal registry.
-- **CLI:** install from your npm mirror, or copy `dist/` and run
-  `node dist/cli.js`.
+### Editor
+
+1. Download `estorm.html` from the
+   [latest release](https://github.com/ville6000/estorm/releases/latest).
+2. Copy it to the offline machine and open it in a browser. No server is
+   needed; drafts are kept in the browser's local storage.
+3. To share it with a team, put the same file on an internal web server or
+   file share.
+
+### CLI
+
+Requires Node.js 22.18 or later. Install it once while online; it then
+works offline, as it has no runtime dependencies:
+
+```sh
+npm install -g @villev/estorm   # online, once
+estorm render board.estorm      # works offline from then on
+```
+
+In a project, `npm install -D @villev/estorm` works the same way:
+`npx estorm` then runs the installed copy without the network. Plain
+`npx @villev/estorm` without installing first needs a connection.
+
+### Docker
+
+1. Online, build the image and save it to a file:
+
+   ```sh
+   docker build -t estorm .
+   docker save estorm -o estorm.tar
+   ```
+
+2. Copy `estorm.tar` across, then load it, or push it to your internal
+   registry for CI:
+
+   ```sh
+   docker load -i estorm.tar
+   docker run --rm -v "$PWD:/work" estorm render board.estorm
+   ```
 
 ## Development
 
