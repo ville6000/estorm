@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parse, ParseError } from '../src/parser.ts';
+import { parse, parseAll, ParseError } from '../src/parser.ts';
 import type { After, Event, Flow, Hotspot, Reaction, When } from '../src/parser.ts';
 
 const lines = (...ls: string[]) => ls.join('\n');
@@ -330,5 +330,66 @@ describe('parse', () => {
 
   it.each(readdirSync('examples').filter((f) => f.endsWith('.estorm')))('parses examples/%s', (f) => {
     expect(parse(readFileSync(`examples/${f}`, 'utf8')).length).toBeGreaterThan(0);
+  });
+});
+
+describe('parseAll', () => {
+  /** [line, message] of every error in TEXT. */
+  const errorsOf = (...ls: string[]) => parseAll(lines(...ls)).errors.map((e) => [e.line, e.message]);
+
+  it('returns no errors and the same board as parse', () => {
+    const text = lines('A: Do -> Done', '  then B -> BDone', 'when BDone', '  then C -> CDone');
+    expect(parseAll(text)).toEqual({ board: parse(text), errors: [] });
+  });
+
+  it('reports every error, by line', () => {
+    expect(errorsOf('A: ->', 'Fine', 'when Nope', '  then C -> CDone', '\tB: Do -> Done')).toEqual([
+      [1, 'empty item in chain'],
+      [3, "'when' refers to unknown event Nope"],
+      [5, 'tab in indentation'],
+    ]);
+  });
+
+  it('keeps the lines that parse', () => {
+    const { board } = parseAll(lines('A: ->', 'B: Do -> Done', '  then Oops', '  then C -> CDone'));
+    expect(board).toMatchObject([{ type: 'flow', line: 2, reactions: [{ type: 'reaction', line: 4 }] }]);
+  });
+
+  it('leaves out the lines under a broken step without reporting them', () => {
+    expect(errorsOf('A: Do ->', '  then B -> BDone', '    then C -> CDone', '  ! Why?', 'D: Do -> DDone')).toEqual([
+      [1, 'empty item in chain'],
+    ]);
+  });
+
+  it('does not report the read models of a broken step', () => {
+    expect(errorsOf('{R}', 'A: Do ->', '== S ==')).toEqual([[2, 'empty item in chain']]);
+  });
+
+  it('keeps the lines under a broken hotspot or rule', () => {
+    expect(errorsOf('A: Do -> Done', '  !', '  *', '  then B -> BDone')).toEqual([
+      [2, 'empty hotspot'],
+      [3, 'empty rule'],
+    ]);
+  });
+
+  it('does not report an unknown event named on a broken line', () => {
+    expect(errorsOf('A: Do -> [Ext -> Done', 'when Done', '  then B -> BDone')).toEqual([[1, 'invalid item: [Ext']]);
+  });
+
+  it('reports each read model that informs nothing, and parses on', () => {
+    const { board, errors } = parseAll(lines('{R1}', '{R2}', '== S ==', '{R3}'));
+    expect(errors.map((e) => [e.line, e.message])).toEqual([
+      [1, 'read model {R1} informs nothing'],
+      [2, 'read model {R2} informs nothing'],
+      [4, 'read model {R3} informs nothing'],
+    ]);
+    expect(board).toMatchObject([{ type: 'section', name: 'S' }]);
+  });
+
+  it('makes parse throw the first error by line', () => {
+    expect(errorOf(lines('A: Do -> Done', 'when Nope', '  then B -> BDone', 'C: ->'))).toEqual([
+      2,
+      "'when' refers to unknown event Nope",
+    ]);
   });
 });

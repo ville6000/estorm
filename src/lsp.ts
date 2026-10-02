@@ -11,7 +11,7 @@
  * Only the small part of the protocol these need is implemented, so the
  * server has no dependencies. Documents are synced in full on each change.
  */
-import { parse, ParseError } from './parser.ts';
+import { parseAll } from './parser.ts';
 import { lint } from './lint.ts';
 import { tokenize, type Token, type TokenKind } from './highlight.ts';
 
@@ -87,11 +87,12 @@ export function semanticTokens(text: string): number[] {
 const ERROR = 1;
 const WARNING = 2;
 
-/** The parse error in TEXT, or else its lint warnings, as LSP diagnostics covering their lines. */
+/** The parse errors in TEXT and the lint warnings for what parsed, as LSP diagnostics covering their lines. */
 export function diagnostics(text: string) {
+  const all = lines(text);
   const diagnostic = (n: number, severity: number, message: string) => {
     const line = n - 1;
-    const content = lines(text)[line] ?? '';
+    const content = all[line] ?? '';
     const start = content.length - content.trimStart().length;
     return {
       range: { start: { line, character: start }, end: { line, character: content.length } },
@@ -100,12 +101,11 @@ export function diagnostics(text: string) {
       message,
     };
   };
-  try {
-    return lint(parse(text)).map((w) => diagnostic(w.line, WARNING, w.message));
-  } catch (e) {
-    if (!(e instanceof ParseError)) throw e;
-    return [diagnostic(e.line, ERROR, e.message)];
-  }
+  const { board, errors } = parseAll(text);
+  return [
+    ...errors.map((e) => diagnostic(e.line, ERROR, e.message)),
+    ...lint(board).map((w) => diagnostic(w.line, WARNING, w.message)),
+  ];
 }
 
 /** Every mention of the event under POS, or [] when it isn't on one. */

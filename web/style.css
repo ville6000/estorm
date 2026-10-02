@@ -272,16 +272,41 @@ select:focus-visible {
   border-color: var(--border);
 }
 
-.error {
-  margin: 0;
-  padding: 8px 12px;
-  border: 0;
+/* Every parse error; scrolls when there are many. */
+.errors {
+  display: flex;
+  flex-direction: column;
+  max-height: 30%;
+  overflow-y: auto;
   border-top: 1px solid var(--error-border);
+  background: var(--error-bg);
+}
+
+.errors[hidden] {
+  display: none;
+}
+
+.errors button {
+  margin: 0;
+  padding: 4px 12px;
+  border: 0;
   border-radius: 0;
   text-align: left;
-  background: var(--error-bg);
+  background: none;
   color: var(--error);
   font-family: var(--mono);
+}
+
+.errors button:first-child {
+  padding-top: 8px;
+}
+
+.errors button:last-child {
+  padding-bottom: 8px;
+}
+
+.errors button:hover {
+  text-decoration: underline;
 }
 
 .preview-pane {

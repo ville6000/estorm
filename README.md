@@ -131,8 +131,8 @@ but downloads the package and so needs a connection.
 
 ## Editor support
 
-For writing boards in your code editor: sticky colours, parse errors and
-lint warnings as you type, highlights for the event under the cursor, and
+For writing boards in your code editor: sticky colours, every parse error
+and lint warning as you type, highlights for the event under the cursor, and
 completion of keywords and of the events, aggregates, externals and actors
 already on the board.
 
@@ -186,13 +186,14 @@ npm install @villev/estorm
 **Use:**
 
 ```ts
-import { parse, layout, svg, render, renderTimeline, summarize, lint, ParseError } from '@villev/estorm';
+import { parse, parseAll, layout, svg, render, renderTimeline, summarize, lint, ParseError } from '@villev/estorm';
 
 const doc = render(text); // parse -> layout -> svg
 const dark = render(text, { theme: 'dark' }); // or 'auto': follows prefers-color-scheme
 const events = renderTimeline(text); // parse -> timeline -> svg
 const prose = summarize(parse(text)); // Markdown overview
 const warnings = lint(parse(text)); // [{ line, message }]
+const { board, errors } = parseAll(text); // every ParseError, and the board without the broken lines
 ```
 
 ## Development

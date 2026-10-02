@@ -18,19 +18,19 @@ npm run dev     # the browser editor, reloading as you change the code
 
 estorm is a small pipeline. Each step is a pure function in its own file:
 
-| File               | Does                                                                |
-| ------------------ | ------------------------------------------------------------------- |
-| `src/parser.ts`    | text to AST, with `ParseError` carrying the line number             |
-| `src/layout.ts`    | AST to positioned stickies, arrows, lanes                           |
-| `src/svg.ts`       | layout to an SVG string                                             |
-| `src/summary.ts`   | AST to a Markdown overview: dependencies, gaps, hotspots            |
-| `src/lint.ts`      | AST to warnings: event tense, aggregates shared by contexts         |
-| `src/index.ts`     | public API: `parse`, `layout`, `svg`, `render`, `summarize`, `lint` |
-| `src/highlight.ts` | one line to tokens, for the editor and the language server          |
-| `src/lsp.ts`       | `estorm lsp`: language server over stdio                            |
-| `src/cli.ts`       | `estorm render / check / lint / summary / serve / lsp`              |
-| `web/`             | the browser editor, built into one file, `estorm.html`              |
-| `examples/`        | example boards and their rendered SVGs                              |
+| File               | Does                                                                                                 |
+| ------------------ | ---------------------------------------------------------------------------------------------------- |
+| `src/parser.ts`    | text to AST, with `ParseError` carrying the line number; `parseAll` recovers and returns every error |
+| `src/layout.ts`    | AST to positioned stickies, arrows, lanes                                                            |
+| `src/svg.ts`       | layout to an SVG string                                                                              |
+| `src/summary.ts`   | AST to a Markdown overview: dependencies, gaps, hotspots                                             |
+| `src/lint.ts`      | AST to warnings: event tense, aggregates shared by contexts                                          |
+| `src/index.ts`     | public API: `parse`, `parseAll`, `layout`, `svg`, `render`, `summarize`, `lint`                      |
+| `src/highlight.ts` | one line to tokens, for the editor and the language server                                           |
+| `src/lsp.ts`       | `estorm lsp`: language server over stdio                                                             |
+| `src/cli.ts`       | `estorm render / check / lint / summary / serve / lsp`                                               |
+| `web/`             | the browser editor, built into one file, `estorm.html`                                               |
+| `examples/`        | example boards and their rendered SVGs                                                               |
 
 The source runs directly on Node.js (type stripping), so there is no build
 step while developing: `npm run estorm -- render board.estorm`. Keep to

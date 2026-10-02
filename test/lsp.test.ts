@@ -72,6 +72,18 @@ describe('diagnostics', () => {
     ]);
   });
 
+  it('reports every parse error, and lint warnings for the lines that parse', () => {
+    const text = ['A: Do -> Done', '  then Oops', 'B: Go -> Going', 'C: ->', 'when Nope', '  then Send -> Sent'].join(
+      '\n',
+    );
+    expect(diagnostics(text).map((d) => [d.range.start.line, d.severity, d.message])).toEqual([
+      [1, 1, 'chain must end with an event'],
+      [3, 1, 'empty item in chain'],
+      [4, 1, "'when' refers to unknown event Nope"],
+      [2, 2, 'event should be in the past tense: Going'],
+    ]);
+  });
+
   it('reports lint warnings with warning severity', () => {
     expect(diagnostics('A: Do -> Doing')).toEqual([
       {

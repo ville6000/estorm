@@ -251,8 +251,8 @@ function checkLevel(steps: Flat[], { type, level, line }: Stmt): void {
   }
 }
 
-function dangling({ line, name }: { line: number; name: string }): never {
-  return fail(line, `read model {${name}} informs nothing`);
+function dangling({ line, name }: { line: number; name: string }): ParseError {
+  return new ParseError(line, `read model {${name}} informs nothing`);
 }
 
 interface Acc {
@@ -264,6 +264,14 @@ interface Acc {
   pending: (ReadModel & { level: number })[];
   /** Index of the latest step in the current section. */
   current: number | null;
+  /** Errors that don't stop the statement that found them. */
+  errors: ParseError[];
+}
+
+/** Reports the read models still waiting, which inform nothing. */
+function flushPending(acc: Acc): void {
+  acc.errors.push(...acc.pending.map(dangling));
+  acc.pending = [];
 }
 
 /**
@@ -293,7 +301,7 @@ function collect(acc: Acc, stmt: Stmt): Acc {
       return acc;
     }
     case 'section': {
-      if (acc.pending[0]) dangling(acc.pending[0]);
+      flushPending(acc);
       acc.board.push({ type: 'section', name: stmt.name, line: stmt.line });
       acc.current = null;
       return acc;
@@ -312,7 +320,7 @@ function collect(acc: Acc, stmt: Stmt): Acc {
     }
     case 'event': {
       checkLevel(acc.steps, stmt);
-      if (acc.pending[0]) dangling(acc.pending[0]);
+      flushPending(acc);
       acc.steps.push({ ...stmt, hotspots: [], reactions: [] });
       acc.current = acc.steps.length - 1;
       return acc;
@@ -320,13 +328,12 @@ function collect(acc: Acc, stmt: Stmt): Acc {
     case 'flow':
     case 'reaction': {
       checkLevel(acc.steps, stmt);
-      const deeper = acc.pending.find((rm) => rm.level > stmt.level);
-      if (deeper) dangling(deeper);
+      acc.errors.push(...acc.pending.filter((rm) => rm.level > stmt.level).map(dangling));
       const { level, ...rest } = stmt;
       acc.steps.push({
         ...rest,
         level,
-        informedBy: acc.pending.map(({ level: _, ...rm }) => rm),
+        informedBy: acc.pending.filter((rm) => rm.level <= stmt.level).map(({ level: _, ...rm }) => rm),
         rules: [],
         hotspots: [],
         reactions: [],
@@ -364,8 +371,17 @@ function* allSteps(trees: Node[]): Generator<Node> {
   }
 }
 
-/** Each 'when' and 'after' needs reactions, and the events they name must exist. */
-function checkTriggers(trees: Node[]): void {
+/**
+ * Each 'when' and 'after' needs reactions, and the events they name must
+ * exist. An event named on a BROKEN line may exist, so it isn't reported.
+ */
+function checkTriggers(trees: Node[], broken: string[]): ParseError[] {
+  const errors: ParseError[] = [];
+  const unknown = (line: number, keyword: string, event: string) => {
+    if (!broken.some((raw) => raw.includes(event))) {
+      errors.push(new ParseError(line, `'${keyword}' refers to unknown event ${event}`));
+    }
+  };
   const known = new Set<string>();
   for (const s of allSteps(trees)) {
     if (s.type === 'flow' || s.type === 'reaction') known.add(s.event);
@@ -373,29 +389,67 @@ function checkTriggers(trees: Node[]): void {
   }
   for (const s of allSteps(trees)) {
     if (s.type !== 'when' && s.type !== 'after') continue;
-    if (s.reactions.length === 0) fail(s.line, `'${s.type}' has no reactions`);
-    if (s.type === 'when' && !known.has(s.event)) {
-      fail(s.line, `'when' refers to unknown event ${s.event}`);
-    }
-    if (s.type === 'after' && s.unless !== undefined && !known.has(s.unless)) {
-      fail(s.line, `'unless' refers to unknown event ${s.unless}`);
-    }
+    if (s.reactions.length === 0) errors.push(new ParseError(s.line, `'${s.type}' has no reactions`));
+    if (s.type === 'when' && !known.has(s.event)) unknown(s.line, 'when', s.event);
+    if (s.type === 'after' && s.unless !== undefined && !known.has(s.unless)) unknown(s.line, 'unless', s.unless);
   }
+  return errors;
+}
+
+/** F's result, or undefined if it threw a ParseError, which goes to ERRORS. */
+function attempt<T>(errors: ParseError[], f: () => T): T | undefined {
+  try {
+    return f();
+  } catch (e) {
+    if (!(e instanceof ParseError)) throw e;
+    errors.push(e);
+    return undefined;
+  }
+}
+
+/** Hotspots and rules have no lines under them; the lines indented below belong to the step above. */
+const isLeaf = (raw: string) => /^\s*[!*]/.test(raw);
+
+/**
+ * Parses as much of TEXT as it can, and returns every error, by line. A line
+ * with an error is left out, and so are the lines indented under it, which
+ * would only report that their parent is missing.
+ */
+export function parseAll(text: string): { board: Board; errors: ParseError[] } {
+  const acc: Acc = { steps: [], board: [], pending: [], current: null, errors: [] };
+  const broken: string[] = [];
+  let brokenLevel: number | null = null;
+  /** Leaves out the lines under the broken line RAW, and the read models it would take. */
+  const breakAt = (raw: string, level: number) => {
+    broken.push(raw);
+    if (isLeaf(raw)) return;
+    brokenLevel = level;
+    acc.pending = acc.pending.filter((rm) => rm.level > level);
+  };
+  text.split(/\r?\n/).forEach((raw, i) => {
+    const stmt = attempt(acc.errors, () => classify(i + 1, raw));
+    if (stmt === undefined) return breakAt(raw, Math.floor(raw.match(/^ */)![0].length / 2));
+    if (stmt === null) return;
+    const { level } = stmt;
+    if (brokenLevel !== null && level > brokenLevel) return;
+    brokenLevel = null;
+    if (!attempt(acc.errors, () => collect(acc, stmt))) breakAt(raw, level);
+  });
+  flushPending(acc);
+  const trees = nest(acc.steps, 0);
+  const errors = [...acc.errors, ...checkTriggers(trees, broken)].sort((a, b) => a.line - b.line);
+  const board = [...(trees as (Flow | Event | When)[]), ...acc.board].sort((a, b) => a.line - b.line);
+  return { board, errors };
 }
 
 /**
  * Parses estorm text into top-level items (flows, events, whens, sections and
  * board hotspots), in source order. Flows and reactions nest their reactions; an
- * 'after' sits among them, holding the reactions it delays.
+ * 'after' sits among them, holding the reactions it delays. Throws the first
+ * error, by line; parseAll returns them all.
  */
 export function parse(text: string): Board {
-  const acc = text
-    .split(/\r?\n/)
-    .map((line, i) => classify(i + 1, line))
-    .filter((s): s is Stmt => s !== null)
-    .reduce(collect, { steps: [], board: [], pending: [], current: null } as Acc);
-  const trees = nest(acc.steps, 0);
-  if (acc.pending[0]) dangling(acc.pending[0]);
-  checkTriggers(trees);
-  return [...(trees as (Flow | Event | When)[]), ...acc.board].sort((a, b) => a.line - b.line);
+  const { board, errors } = parseAll(text);
+  if (errors[0]) throw errors[0];
+  return board;
 }
