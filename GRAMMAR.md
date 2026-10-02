@@ -268,6 +268,23 @@ A `when` takes its reactions:
 ]
 ```
 
+## Timeline view
+
+`estorm render --timeline`, and the Timeline button in the browser editor,
+draw only the events, on one time axis left to right for the whole board.
+Sections are horizontal swimlanes, top to bottom in order of first
+appearance. An event produced more than once is drawn once, in the section
+of its first producer.
+
+An event's column is the longest chain of causes before it: a reaction's
+event comes after the event it reacts to (also through `after` and `when`),
+and an event in a run comes after the one before it. Within a section, a
+flow, run or `when` is never left of the one above it. Events of a section
+in the same column stack, in source order. `unless` doesn't affect order.
+
+Arrows link reactions within a section; dashed links follow `when` and
+cross sections. Hotspots and the other stickies are left out.
+
 ## Errors
 
 Reported as `<file>:<line>: <message>`, e.g.

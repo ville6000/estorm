@@ -6,12 +6,13 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { parseArgs } from 'node:util';
-import { lint, parse, ParseError, render, summarize } from './index.ts';
+import { lint, parse, ParseError, render, renderTimeline, summarize } from './index.ts';
 import { serveStdio } from './lsp.ts';
 
 const USAGE = `Usage:
   estorm render <file.estorm>...         write <file>.svg next to each file
   estorm render <file.estorm> -o <out>   write to <out> ('-' for stdout)
+  estorm render -t <file.estorm>...      timeline view, to <file>.timeline.svg
   estorm check <file.estorm>...          report errors only
   estorm lint <file.estorm>...           errors and modelling warnings
   estorm summary <file.estorm>...        overview: actors, aggregates, gaps, hotspots
@@ -20,6 +21,7 @@ const USAGE = `Usage:
 
 Options:
   -o, --out <file>    output file for a single input
+  -t, --timeline      render the timeline: events only, sections as swimlanes
   -p, --port <port>   preview port (default 8080)
   -h, --help          show this help
   -v, --version       show the version`;
@@ -51,23 +53,23 @@ function compile(file: string, convert: (text: string) => string = render): Resu
   }
 }
 
-function svgPath(file: string): string {
-  return file.replace(/\.estorm$/, '') + '.svg';
+function svgPath(file: string, suffix = '.svg'): string {
+  return file.replace(/\.estorm$/, '') + suffix;
 }
 
-function renderFiles(files: string[], out: string | undefined): number {
+function renderFiles(files: string[], out: string | undefined, timeline = false): number {
   if (files.length === 0) throw new UsageError('render needs at least one file');
   if (out !== undefined && files.length > 1) throw new UsageError('-o works with a single file only');
   let failed = 0;
   for (const file of files) {
-    const result = compile(file);
+    const result = compile(file, timeline ? renderTimeline : render);
     if ('error' in result) {
       console.error(result.error);
       failed++;
     } else if (out === '-') {
       process.stdout.write(result.out);
     } else {
-      const target = out ?? svgPath(file);
+      const target = out ?? svgPath(file, timeline ? '.timeline.svg' : '.svg');
       writeFileSync(target, result.out);
       console.error(`wrote ${target}`);
     }
@@ -200,6 +202,7 @@ async function main(argv: string[]): Promise<number> {
     allowPositionals: true,
     options: {
       out: { type: 'string', short: 'o' },
+      timeline: { type: 'boolean', short: 't' },
       port: { type: 'string', short: 'p', default: '8080' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
@@ -218,7 +221,7 @@ async function main(argv: string[]): Promise<number> {
   const [command, ...files] = positionals;
   switch (command) {
     case 'render':
-      return renderFiles(files, values.out);
+      return renderFiles(files, values.out, values.timeline);
     case 'check':
       return check(files);
     case 'lint':
