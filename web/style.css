@@ -244,7 +244,7 @@ select:focus-visible {
   cursor: pointer;
 }
 
-.cheatsheet {
+.panel {
   position: absolute;
   top: 12px;
   right: 16px;
@@ -256,8 +256,40 @@ select:focus-visible {
   box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
 }
 
-.cheatsheet h2 {
+.panel h2 {
   font-size: 15px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.summary {
+  width: min(480px, calc(100% - 32px));
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+}
+
+.summary.stale #summary-body {
+  opacity: 0.4;
+}
+
+.summary h3 {
+  margin: 16px 0 4px;
+  font-size: 13px;
+}
+
+.summary p {
+  margin: 0 0 4px;
+  color: var(--muted);
+}
+
+.summary ul {
+  margin: 0;
+  padding-left: 20px;
 }
 
 .cheatsheet pre {

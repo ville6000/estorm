@@ -52,7 +52,8 @@ Download `estorm.html` from the
 [latest release](https://github.com/ville6000/estorm/releases/latest) and
 open it. It is a single self-contained file that works offline: edit on the
 left, see the board on the right, click a sticky to jump to its line, open
-and save `.estorm` files, and export SVG.
+and save `.estorm` files, export SVG, and open a summary of actors,
+aggregates, context dependencies, gaps and hotspots.
 
 It is also hosted at <https://ville6000.github.io/estorm/>, updated on
 each release.
@@ -69,6 +70,7 @@ npx @villev/estorm render board.estorm        # writes board.svg
 npx @villev/estorm render docs/*.estorm       # one SVG next to each file
 npx @villev/estorm render board.estorm -o -   # SVG to stdout
 npx @villev/estorm check docs/*.estorm        # errors only, for CI
+npx @villev/estorm summary board.estorm       # actors, aggregates, gaps, hotspots
 npx @villev/estorm serve board.estorm         # live preview at http://localhost:8080
 ```
 
@@ -99,9 +101,10 @@ boards:
 ### In your own code
 
 ```ts
-import { parse, layout, svg, render, ParseError } from '@villev/estorm';
+import { parse, layout, svg, render, summarize, ParseError } from '@villev/estorm';
 
 const doc = render(text); // parse -> layout -> svg
+const prose = summarize(parse(text)); // Markdown overview
 ```
 
 ## Running it without internet access

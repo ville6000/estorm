@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 /**
- * estorm command line: render boards to SVG, check them in CI, or preview
- * one live in the browser while editing it.
+ * estorm command line: render boards to SVG, check them in CI, summarise
+ * them, or preview one live in the browser while editing it.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { parseArgs } from 'node:util';
-import { ParseError, render } from './index.ts';
+import { parse, ParseError, render, summarize } from './index.ts';
 import { serveStdio } from './lsp.ts';
 
 const USAGE = `Usage:
   estorm render <file.estorm>...         write <file>.svg next to each file
   estorm render <file.estorm> -o <out>   write to <out> ('-' for stdout)
   estorm check <file.estorm>...          report errors only
+  estorm summary <file.estorm>...        overview: actors, aggregates, gaps, hotspots
   estorm serve <file.estorm> [-p 8080]   live preview at http://localhost:8080
   estorm lsp                             language server over stdio, for editors
 
@@ -24,7 +25,7 @@ Options:
 
 class UsageError extends Error {}
 
-type Result = { svg: string } | { error: string };
+type Result = { out: string } | { error: string };
 
 const READ_ERRORS: Record<string, string> = {
   ENOENT: 'no such file',
@@ -32,8 +33,8 @@ const READ_ERRORS: Record<string, string> = {
   EACCES: 'permission denied',
 };
 
-/** The SVG for FILE, or its first error as "file:line: message". */
-function compile(file: string): Result {
+/** FILE through CONVERT (SVG by default), or its first error as "file:line: message". */
+function compile(file: string, convert: (text: string) => string = render): Result {
   let text: string;
   try {
     text = readFileSync(file, 'utf8');
@@ -42,7 +43,7 @@ function compile(file: string): Result {
     return { error: `${file}: ${READ_ERRORS[code ?? ''] ?? 'cannot read file'}` };
   }
   try {
-    return { svg: render(text) };
+    return { out: convert(text) };
   } catch (e) {
     if (e instanceof ParseError) return { error: `${file}:${e.line}: ${e.message}` };
     throw e;
@@ -63,10 +64,10 @@ function renderFiles(files: string[], out: string | undefined): number {
       console.error(result.error);
       failed++;
     } else if (out === '-') {
-      process.stdout.write(result.svg);
+      process.stdout.write(result.out);
     } else {
       const target = out ?? svgPath(file);
-      writeFileSync(target, result.svg);
+      writeFileSync(target, result.out);
       console.error(`wrote ${target}`);
     }
   }
@@ -75,9 +76,26 @@ function renderFiles(files: string[], out: string | undefined): number {
 
 function check(files: string[]): number {
   if (files.length === 0) throw new UsageError('check needs at least one file');
-  const errors = files.map(compile).filter((r) => 'error' in r);
+  const errors = files.map((f) => compile(f)).filter((r) => 'error' in r);
   for (const r of errors) console.error(r.error);
   return errors.length ? 1 : 0;
+}
+
+function summary(files: string[]): number {
+  if (files.length === 0) throw new UsageError('summary needs at least one file');
+  let failed = 0;
+  files.forEach((file, i) => {
+    const result = compile(file, (text) => summarize(parse(text)));
+    if ('error' in result) {
+      console.error(result.error);
+      failed++;
+    } else {
+      // With several files, a heading tells their summaries apart.
+      const heading = files.length > 1 ? `${i ? '\n' : ''}# ${file}\n\n` : '';
+      process.stdout.write(heading + result.out);
+    }
+  });
+  return failed ? 1 : 0;
 }
 
 const PREVIEW = (file: string) => `<!doctype html>
@@ -139,7 +157,7 @@ function serve(files: string[], port: number): Promise<number> {
       if ('error' in result) {
         res.writeHead(422, { 'Content-Type': 'text/plain; charset=utf-8' }).end(result.error);
       } else {
-        res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8' }).end(result.svg);
+        res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8' }).end(result.out);
       }
     } else {
       res.writeHead(404).end('not found');
@@ -186,6 +204,8 @@ async function main(argv: string[]): Promise<number> {
       return renderFiles(files, values.out);
     case 'check':
       return check(files);
+    case 'summary':
+      return summary(files);
     case 'serve': {
       const port = Number(values.port);
       if (!Number.isInteger(port) || port < 1 || port > 65535) throw new UsageError(`invalid port: ${values.port}`);
