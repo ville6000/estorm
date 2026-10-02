@@ -3,13 +3,14 @@
  * Speaks the Language Server Protocol over stdio and provides:
  *
  *   semantic tokens     colours, named after the sticky each token becomes
- *   diagnostics         parse errors, on the offending line
+ *   diagnostics         parse errors and lint warnings, on the offending line
  *   document highlight  every mention of the event under the cursor
  *
  * Only the small part of the protocol these need is implemented, so the
  * server has no dependencies. Documents are synced in full on each change.
  */
 import { parse, ParseError } from './parser.ts';
+import { lint } from './lint.ts';
 import { tokenize, type Token, type TokenKind } from './highlight.ts';
 
 /**
@@ -79,24 +80,27 @@ export function semanticTokens(text: string): number[] {
   return data;
 }
 
-/** The parse error in TEXT as an LSP diagnostic covering its line, if any. */
+const ERROR = 1;
+const WARNING = 2;
+
+/** The parse error in TEXT, or else its lint warnings, as LSP diagnostics covering their lines. */
 export function diagnostics(text: string) {
-  try {
-    parse(text);
-    return [];
-  } catch (e) {
-    if (!(e instanceof ParseError)) throw e;
-    const line = e.line - 1;
+  const diagnostic = (n: number, severity: number, message: string) => {
+    const line = n - 1;
     const content = lines(text)[line] ?? '';
     const start = content.length - content.trimStart().length;
-    return [
-      {
-        range: { start: { line, character: start }, end: { line, character: content.length } },
-        severity: 1,
-        source: 'estorm',
-        message: e.message,
-      },
-    ];
+    return {
+      range: { start: { line, character: start }, end: { line, character: content.length } },
+      severity,
+      source: 'estorm',
+      message,
+    };
+  };
+  try {
+    return lint(parse(text)).map((w) => diagnostic(w.line, WARNING, w.message));
+  } catch (e) {
+    if (!(e instanceof ParseError)) throw e;
+    return [diagnostic(e.line, ERROR, e.message)];
   }
 }
 

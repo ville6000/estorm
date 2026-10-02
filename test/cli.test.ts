@@ -37,6 +37,21 @@ describe('cli', () => {
     expect(stderr.trim()).toBe(`${file}:2: chain must end with an event`);
   });
 
+  it('lints clean boards without output', () => {
+    const { status, stderr } = run('lint', fixture('A: Do -> Done'));
+    expect(status).toBe(0);
+    expect(stderr).toBe('');
+  });
+
+  it('reports lint warnings and parse errors as file:line: message', () => {
+    const [warned, broken] = [fixture('A: Do -> Doing'), fixture('A: Do -> (Oops)')];
+    const { status, stderr } = run('lint', warned, broken);
+    expect(status).toBe(1);
+    expect(stderr).toBe(
+      `${warned}:1: event should be in the past tense: Doing\n${broken}:1: chain must end with an event, got (Oops)\n`,
+    );
+  });
+
   it('summarises to stdout', () => {
     const { status, stdout } = run('summary', fixture('A: Do -> Done'));
     expect(status).toBe(0);

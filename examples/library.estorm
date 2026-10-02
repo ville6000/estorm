@@ -14,4 +14,4 @@ Librarian: Send overdue reminder -> [Email service] -> OverdueReminderSent
 Member: Return book -> (Loan) -> BookReturned
   then Close loan -> (Loan) -> LoanClosed
   {Reservation queue}
-  then Notify next in queue -> [SMS gateway] -> ReservationReady
+  then Notify next in queue -> [SMS gateway] -> NextMemberNotified

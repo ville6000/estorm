@@ -52,8 +52,8 @@ Download `estorm.html` from the
 [latest release](https://github.com/ville6000/estorm/releases/latest) and
 open it. It is a single self-contained file that works offline: edit on the
 left, see the board on the right, click a sticky to jump to its line, open
-and save `.estorm` files, export SVG, and open a summary of actors,
-aggregates, context dependencies, gaps and hotspots.
+and save `.estorm` files, export SVG, and open a summary of lint warnings,
+actors, aggregates, context dependencies, gaps and hotspots.
 
 It is also hosted at <https://ville6000.github.io/estorm/>, updated on
 each release.
@@ -70,17 +70,21 @@ npx @villev/estorm render board.estorm        # writes board.svg
 npx @villev/estorm render docs/*.estorm       # one SVG next to each file
 npx @villev/estorm render board.estorm -o -   # SVG to stdout
 npx @villev/estorm check docs/*.estorm        # errors only, for CI
+npx @villev/estorm lint docs/*.estorm         # errors and modelling warnings
 npx @villev/estorm summary board.estorm       # actors, aggregates, gaps, hotspots
 npx @villev/estorm serve board.estorm         # live preview at http://localhost:8080
 ```
 
 Errors are reported as `file:line: message`, and the exit code is non-zero.
+`lint` also warns about events not named in the past tense and aggregates
+used in more than one bounded context; see
+[GRAMMAR.md](GRAMMAR.md#warnings).
 
 ### In your editor
 
 `estorm lsp` is a language server for any editor that speaks LSP: sticky
-colours, parse errors as you type, and highlights for the event under the
-cursor. Setup for Neovim is in [EDITORS.md](EDITORS.md).
+colours, parse errors and lint warnings as you type, and highlights for the
+event under the cursor. Setup for Neovim is in [EDITORS.md](EDITORS.md).
 
 ### In Docker or CI
 
@@ -101,10 +105,11 @@ boards:
 ### In your own code
 
 ```ts
-import { parse, layout, svg, render, summarize, ParseError } from '@villev/estorm';
+import { parse, layout, svg, render, summarize, lint, ParseError } from '@villev/estorm';
 
 const doc = render(text); // parse -> layout -> svg
 const prose = summarize(parse(text)); // Markdown overview
+const warnings = lint(parse(text)); // [{ line, message }]
 ```
 
 ## Running it without internet access

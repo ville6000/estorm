@@ -67,6 +67,17 @@ describe('diagnostics', () => {
       },
     ]);
   });
+
+  it('reports lint warnings with warning severity', () => {
+    expect(diagnostics('A: Do -> Doing')).toEqual([
+      {
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 14 } },
+        severity: 2,
+        source: 'estorm',
+        message: 'event should be in the past tense: Doing',
+      },
+    ]);
+  });
 });
 
 describe('eventHighlights', () => {

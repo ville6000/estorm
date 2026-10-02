@@ -292,6 +292,19 @@ Structure
 - `'when' refers to unknown event TicketSubmited`
 - `'unless' refers to unknown event CustomerFolowedUp`
 
+## Warnings
+
+`estorm lint`, the language server and the browser editor also warn about
+boards that parse but model the domain poorly. Warnings never stop a board
+from rendering.
+
+- `event should be in the past tense: SubmitTicket`: no word of the event
+  name is a past participle. A heuristic: words ending in `-ed` and common
+  irregular ones (`Sent`, `Paid`, `Taken`) count.
+- `aggregate Ticket is used in several contexts: Support, Billing`: the same
+  aggregate appears in more than one section. Reported at its first use in
+  the second context.
+
 ## Open questions
 
 - One command → several events? (`-> A, B`)

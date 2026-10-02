@@ -15,4 +15,4 @@ Receptionist: Check out guest -> (Booking) -> GuestCheckedOut
 
 {Rooms to clean}
 Housekeeper: Clean room -> (Room) -> RoomCleaned
-  then Release room for sale -> (Room) -> RoomAvailable
+  then Release room for sale -> (Room) -> RoomReleased

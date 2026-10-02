@@ -4,6 +4,7 @@
  *   render(text)               estorm text -> SVG string
  *   parse(text) -> layout(...) -> svg(...)   the same, step by step
  *   summarize(parse(text))     a Markdown overview of the board
+ *   lint(parse(text))          modelling warnings, such as events not in the past tense
  */
 import { parse } from './parser.ts';
 import { layout } from './layout.ts';
@@ -15,6 +16,8 @@ export { layout } from './layout.ts';
 export type { Kind, Lane, Layout, Path, Point, Rect, Sticky } from './layout.ts';
 export { svg, wrap, COLORS } from './svg.ts';
 export { summarize } from './summary.ts';
+export { lint } from './lint.ts';
+export type { Warning } from './lint.ts';
 
 /** Renders estorm text to a standalone SVG document. Throws ParseError. */
 export function render(text: string): string {

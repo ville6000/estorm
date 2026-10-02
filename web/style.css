@@ -7,6 +7,7 @@
   --accent: #1c7ed6;
   --error-bg: #ffe3e3;
   --error: #c92a2a;
+  --warning: #c25e00;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light;
 }
@@ -273,6 +274,7 @@ select:focus-visible {
   overflow-y: auto;
 }
 
+.summary.stale #warnings,
 .summary.stale #summary-body {
   opacity: 0.4;
 }
@@ -290,6 +292,20 @@ select:focus-visible {
 .summary ul {
   margin: 0;
   padding-left: 20px;
+}
+
+#warnings button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--warning);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+#warnings button:hover {
+  text-decoration: underline;
 }
 
 .cheatsheet pre {
