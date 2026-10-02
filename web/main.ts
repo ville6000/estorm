@@ -343,8 +343,8 @@ fileInput.addEventListener('change', async () => {
   fileInput.value = '';
 });
 
-function download(name: string, text: string, type: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type }));
+function download(name: string, data: string | Blob, type: string): void {
+  const url = URL.createObjectURL(data instanceof Blob ? data : new Blob([data], { type }));
   const a = Object.assign(document.createElement('a'), { href: url, download: name });
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -381,12 +381,48 @@ async function save(): Promise<void> {
   renderBoard();
 }
 
-function exportSvg(): void {
+/** The board as SVG, or null after telling the user to fix the parse error first. */
+function boardSvg(): string | null {
   try {
-    download(state.name.replace(/\.estorm$/, '') + '.svg', svg(layout(parse(sourceText()))) + '\n', 'image/svg+xml');
+    return svg(layout(parse(sourceText())));
   } catch (e) {
     if (!(e instanceof ParseError)) throw e;
     alert(`Fix the error first: line ${e.line}: ${e.message}`);
+    return null;
+  }
+}
+
+function exportSvg(): void {
+  const text = boardSvg();
+  if (text !== null) download(state.name.replace(/\.estorm$/, '') + '.svg', text + '\n', 'image/svg+xml');
+}
+
+// Safari refuses canvases over 16,777,216 pixels; every browser over 16,384 per side.
+const MAX_CANVAS_PIXELS = 16_000_000;
+const MAX_CANVAS_SIDE = 16_384;
+
+/** Draws the board on a canvas at twice its size, or less if the board is too big. */
+async function exportPng(): Promise<void> {
+  const text = boardSvg();
+  if (text === null) return;
+  const url = URL.createObjectURL(new Blob([text], { type: 'image/svg+xml' }));
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    const scale = Math.min(2, Math.sqrt(MAX_CANVAS_PIXELS / (w * h)), MAX_CANVAS_SIDE / Math.max(w, h));
+    const canvas = Object.assign(document.createElement('canvas'), {
+      width: Math.floor(w * scale),
+      height: Math.floor(h * scale),
+    });
+    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!png) throw new Error('The board is too big to export as PNG');
+    download(state.name.replace(/\.estorm$/, '') + '.png', png, 'image/png');
+  } finally {
+    URL.revokeObjectURL(url);
   }
 }
 
@@ -422,6 +458,7 @@ $('open').addEventListener('click', () => void open());
 $('save').addEventListener('click', () => void save());
 $('save-as').addEventListener('click', () => void saveAs());
 $('export').addEventListener('click', exportSvg);
+$('export-png').addEventListener('click', () => void exportPng());
 $('zoom-in').addEventListener('click', () => zoomBy(1));
 $('zoom-out').addEventListener('click', () => zoomBy(-1));
 $('zoom-reset').addEventListener('click', () => {
