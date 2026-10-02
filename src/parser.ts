@@ -182,10 +182,12 @@ function classify(n: number, raw: string): Stmt | null {
     if (t === '') fail(n, 'empty rule');
     return { ...base, type: 'rule', text: t };
   }
-  if ((m = text.match(/^==\s*(.*?)\s*==$/))) {
-    if (m[1] === '') fail(n, 'empty section name');
+  // Not a regex: /^==\s*(.*?)\s*==$/ backtracks cubically on long runs of spaces.
+  if (text.length >= 4 && text.startsWith('==') && text.endsWith('==')) {
+    const name = text.slice(2, -2).trim();
+    if (name === '') fail(n, 'empty section name');
     if (base.level > 0) fail(n, 'section must not be indented');
-    return { ...base, type: 'section', name: m[1]! };
+    return { ...base, type: 'section', name };
   }
   if ((m = text.match(/^\{([^{}]+)\}$/))) {
     return { ...base, type: 'read-model', name: m[1]!.trim() };
