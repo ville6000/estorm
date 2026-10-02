@@ -7,6 +7,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { parseArgs } from 'node:util';
 import { lint, parse, ParseError, render, renderTimeline, summarize } from './index.ts';
+import type { Theme } from './index.ts';
 import { serveStdio } from './lsp.ts';
 
 const USAGE = `Usage:
@@ -22,6 +23,8 @@ const USAGE = `Usage:
 Options:
   -o, --out <file>    output file for a single input
   -t, --timeline      render the timeline: events only, sections as swimlanes
+  --theme <theme>     light (default for render), dark, or auto: follows the
+                      viewer's colour scheme (default for serve)
   -p, --port <port>   preview port (default 8080)
   -h, --help          show this help
   -v, --version       show the version`;
@@ -57,12 +60,20 @@ function svgPath(file: string, suffix = '.svg'): string {
   return file.replace(/\.estorm$/, '') + suffix;
 }
 
-function renderFiles(files: string[], out: string | undefined, timeline = false): number {
+const THEMES: Theme[] = ['light', 'dark', 'auto'];
+
+function parseTheme(value: string | undefined, fallback: Theme): Theme {
+  if (value === undefined) return fallback;
+  if (!THEMES.includes(value as Theme)) throw new UsageError(`invalid theme: ${value}`);
+  return value as Theme;
+}
+
+function renderFiles(files: string[], out: string | undefined, timeline = false, theme: Theme = 'light'): number {
   if (files.length === 0) throw new UsageError('render needs at least one file');
   if (out !== undefined && files.length > 1) throw new UsageError('-o works with a single file only');
   let failed = 0;
   for (const file of files) {
-    const result = compile(file, timeline ? renderTimeline : render);
+    const result = compile(file, (text) => (timeline ? renderTimeline : render)(text, { theme }));
     if ('error' in result) {
       console.error(result.error);
       failed++;
@@ -123,12 +134,17 @@ const PREVIEW = (file: string) => `<!doctype html>
 <meta charset="utf-8">
 <title>estorm · ${file.replace(/[<>&"]/g, '')}</title>
 <style>
+  :root { color-scheme: light dark; }
   body { margin: 0; font-family: system-ui, sans-serif; background: #f1f3f5; }
   #error { display: none; position: sticky; top: 0; margin: 0; padding: 10px 16px;
            background: #ffe3e3; color: #c92a2a; white-space: pre-wrap; }
   #error.show { display: block; }
   #diagram { padding: 16px; }
   #diagram.stale { opacity: 0.4; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #101113; }
+    #error { background: #3b1f22; color: #ffa8a8; }
+  }
 </style>
 </head>
 <body>
@@ -165,14 +181,14 @@ const PREVIEW = (file: string) => `<!doctype html>
 </html>`;
 
 /** Serves a live preview of FILE; the page re-renders it every second. */
-function serve(files: string[], port: number): Promise<number> {
+function serve(files: string[], port: number, theme: Theme = 'auto'): Promise<number> {
   const [file] = files;
   if (files.length !== 1 || file === undefined) throw new UsageError('serve needs exactly one file');
   const server = createServer((req, res) => {
     if (req.url === '/') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(PREVIEW(file));
     } else if (req.url === '/diagram.svg') {
-      const result = compile(file);
+      const result = compile(file, (text) => render(text, { theme }));
       if ('error' in result) {
         res.writeHead(422, { 'Content-Type': 'text/plain; charset=utf-8' }).end(result.error);
       } else {
@@ -203,6 +219,7 @@ async function main(argv: string[]): Promise<number> {
     options: {
       out: { type: 'string', short: 'o' },
       timeline: { type: 'boolean', short: 't' },
+      theme: { type: 'string' },
       port: { type: 'string', short: 'p', default: '8080' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
@@ -221,7 +238,7 @@ async function main(argv: string[]): Promise<number> {
   const [command, ...files] = positionals;
   switch (command) {
     case 'render':
-      return renderFiles(files, values.out, values.timeline);
+      return renderFiles(files, values.out, values.timeline, parseTheme(values.theme, 'light'));
     case 'check':
       return check(files);
     case 'lint':
@@ -231,7 +248,7 @@ async function main(argv: string[]): Promise<number> {
     case 'serve': {
       const port = Number(values.port);
       if (!Number.isInteger(port) || port < 1 || port > 65535) throw new UsageError(`invalid port: ${values.port}`);
-      return serve(files, port);
+      return serve(files, port, parseTheme(values.theme, 'auto'));
     }
     case 'lsp':
       serveStdio();
