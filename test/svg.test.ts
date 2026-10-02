@@ -44,6 +44,12 @@ describe('svg', () => {
     expect(doc).toContain('class="gap"');
   });
 
+  it('lists rules inside their aggregate', () => {
+    const doc = render('A: Do -> (Order) -> Done\n  * Total & tax > 0');
+    expect(doc).toContain('class="rule"');
+    expect(doc).toContain('Total &amp; tax &gt; 0');
+  });
+
   it('draws cancels', () => {
     const doc = render('A: Do -> Done\n  after 1 day unless Gone\n    then B -> BDone\nX: Go -> Gone');
     expect(doc).toContain('class="cancel"');

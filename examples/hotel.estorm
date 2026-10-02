@@ -1,6 +1,8 @@
 # Hotel booking
 {Room availability}
 Guest: Book room -> (Booking) -> RoomBooked
+  * A room is never double-booked for a night
+  * A stay lasts at least one night
   then Take deposit -> [Payment provider] -> DepositTaken
   then Send booking confirmation -> [Email service] -> BookingConfirmationSent
 
@@ -16,3 +18,4 @@ Receptionist: Check out guest -> (Booking) -> GuestCheckedOut
 {Rooms to clean}
 Housekeeper: Clean room -> (Room) -> RoomCleaned
   then Release room for sale -> (Room) -> RoomReleased
+    * Only clean rooms go on sale

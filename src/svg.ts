@@ -1,6 +1,19 @@
 /** Renders a layout (see layout.ts) as a standalone SVG document. */
 import { LANE_LABEL_H, LANE_PAD } from './layout.ts';
 import type { Kind, Lane, Layout, Path, Rect, Sticky } from './layout.ts';
+import {
+  BULLET_W,
+  FONT_SIZE,
+  LINE_HEIGHT,
+  maxChars,
+  PADDING,
+  RULE_FONT_SIZE,
+  RULE_LINE_HEIGHT,
+  ruled,
+  wrap,
+} from './text.ts';
+
+export { wrap } from './text.ts';
 
 export const COLORS: Record<Kind, string> = {
   event: '#ffa94d',
@@ -13,10 +26,6 @@ export const COLORS: Record<Kind, string> = {
   'read-model': '#8ce99a',
   hotspot: '#ff6b6b',
 };
-
-const FONT_SIZE = 13;
-const LINE_HEIGHT = 16;
-const PADDING = 8;
 
 function escape(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -33,45 +42,10 @@ function el(tag: string, attrs: Attrs, children: string | string[] = []): string
   return body === '' ? `<${tag}${a}/>` : `<${tag}${a}>${body}</${tag}>`;
 }
 
-/**
- * [piece, spaceBefore] pieces of WORD, none longer than MAX_CHARS. Long
- * words split at camel case humps first, e.g. CustomerDetailsFetched.
- */
-function splitWord(word: string, maxChars: number): [string, boolean][] {
-  const parts =
-    word.length <= maxChars
-      ? [word]
-      : word.split(/(?<=[a-z])(?=[A-Z])/).flatMap((p) => p.match(new RegExp(`.{1,${maxChars}}`, 'gu')) ?? [p]);
-  return parts.map((p, i) => [p, i === 0]);
-}
-
-/** Greedy word wrap of TEXT into lines of at most MAX_CHARS. */
-export function wrap(text: string, maxChars: number): string[] {
-  const pieces = text
-    .trim()
-    .split(/\s+/)
-    .flatMap((w) => splitWord(w, maxChars));
-  const lines: string[] = [];
-  let cur = '';
-  for (const [piece, space] of pieces) {
-    const joined = cur + (space ? ' ' : '') + piece;
-    if (cur === '') cur = piece;
-    else if (joined.length <= maxChars) cur = joined;
-    else {
-      lines.push(cur);
-      cur = piece;
-    }
-  }
-  if (cur !== '') lines.push(cur);
-  return lines;
-}
-
-function sticky({ kind, text, line, x, y, w, h }: Sticky): string {
-  const maxChars = Math.floor((w - 2 * PADDING) / (0.6 * FONT_SIZE));
-  const lines = wrap(text, maxChars);
+function sticky(s: Sticky): string {
+  const { kind, text, line, x, y, w, h } = s;
   const cx = x + 0.5 * w;
   const cy = y + 0.5 * h;
-  const top = cy - 0.5 * (lines.length - 1) * LINE_HEIGHT + 0.35 * FONT_SIZE;
   return el(
     'g',
     {
@@ -81,13 +55,63 @@ function sticky({ kind, text, line, x, y, w, h }: Sticky): string {
     },
     [
       el('rect', { x, y, width: w, height: h, fill: COLORS[kind], filter: 'url(#shadow)' }),
-      el(
-        'text',
-        { x: cx, y: top, 'text-anchor': 'middle', 'font-size': FONT_SIZE, fill: '#212529' },
-        lines.map((l, i) => el('tspan', { x: cx, dy: i === 0 ? 0 : LINE_HEIGHT }, escape(l))),
-      ),
+      ...(s.rules?.length ? ruledText(s) : [centredText(s)]),
     ],
   );
+}
+
+function centredText({ text, x, y, w, h }: Sticky): string {
+  const lines = wrap(text, maxChars(w));
+  const cx = x + 0.5 * w;
+  const top = y + 0.5 * h - 0.5 * (lines.length - 1) * LINE_HEIGHT + 0.35 * FONT_SIZE;
+  return el(
+    'text',
+    { x: cx, y: top, 'text-anchor': 'middle', 'font-size': FONT_SIZE, fill: '#212529' },
+    lines.map((l, i) => el('tspan', { x: cx, dy: i === 0 ? 0 : LINE_HEIGHT }, escape(l))),
+  );
+}
+
+/** The name at the top, then a divider, then each rule as a bullet. */
+function ruledText({ text, rules, x, y, w }: Sticky): string[] {
+  const r = ruled(text, rules!, w);
+  const cx = x + 0.5 * w;
+  const left = x + PADDING;
+  let ry = y + r.rulesY;
+  const bullets = r.rules.map((lines) => {
+    const out = el('g', { class: 'rule' }, [
+      el('text', { x: left, y: ry, 'font-size': RULE_FONT_SIZE, fill: '#212529' }, '•'),
+      el(
+        'text',
+        { x: left + BULLET_W, y: ry, 'font-size': RULE_FONT_SIZE, fill: '#212529' },
+        lines.map((l, i) => el('tspan', { x: left + BULLET_W, dy: i === 0 ? 0 : RULE_LINE_HEIGHT }, escape(l))),
+      ),
+    ]);
+    ry += lines.length * RULE_LINE_HEIGHT;
+    return out;
+  });
+  return [
+    el(
+      'text',
+      {
+        x: cx,
+        y: y + r.nameY,
+        'text-anchor': 'middle',
+        'font-size': FONT_SIZE,
+        'font-weight': 'bold',
+        fill: '#212529',
+      },
+      r.name.map((l, i) => el('tspan', { x: cx, dy: i === 0 ? 0 : LINE_HEIGHT }, escape(l))),
+    ),
+    el('line', {
+      x1: left,
+      x2: x + w - PADDING,
+      y1: y + r.dividerY,
+      y2: y + r.dividerY,
+      stroke: '#212529',
+      'stroke-opacity': 0.3,
+    }),
+    ...bullets,
+  ];
 }
 
 function pathD(points: Path): string {

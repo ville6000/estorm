@@ -40,6 +40,10 @@ describe('semanticTokens', () => {
     expect(decode('{Order list}')).toEqual([[0, '{Order list}', 'readModel']]);
   });
 
+  it('marks rules', () => {
+    expect(decode('  * Never overbooked')).toEqual([[0, '* Never overbooked', 'rule']]);
+  });
+
   it('handles CRLF line endings', () => {
     expect(decode('A: Do -> Done\r\n# note').map(([l, , type]) => [l, type])).toEqual([
       [0, 'actor'],

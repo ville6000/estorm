@@ -1,10 +1,10 @@
 /**
  * Summarises a board as Markdown: what is hard to see on the board itself,
  * such as how bounded contexts depend on each other, what each actor does,
- * which commands each aggregate handles, events nothing reacts to, and all
+ * which commands each aggregate handles and the rules it enforces, events nothing reacts to, and all
  * hotspots in one list.
  */
-import type { Board, Hotspot, Step, Via } from './parser.ts';
+import type { Board, Hotspot, Rule, Step, Via } from './parser.ts';
 
 /** Keys in insertion order, each with its distinct values in insertion order. */
 class Groups extends Map<string, Set<string>> {
@@ -25,6 +25,7 @@ interface Facts {
   reactions: { event: string; section: string | undefined }[];
   actors: Groups;
   aggregates: Groups;
+  rules: Groups;
   externals: Groups;
   hotspots: string[];
 }
@@ -35,6 +36,7 @@ function collect(board: Board): Facts {
     reactions: [],
     actors: new Groups(),
     aggregates: new Groups(),
+    rules: new Groups(),
     externals: new Groups(),
     hotspots: [],
   };
@@ -48,8 +50,10 @@ function collect(board: Board): Facts {
     const where = section === undefined ? on : `${section}, ${on}`;
     for (const h of list) facts.hotspots.push(`- ${h.text} (${where})`);
   };
-  const command = (name: string, via: Via[]) => {
+  const command = (name: string, via: Via[], rules: Rule[]) => {
     for (const v of via) (v.type === 'aggregate' ? facts.aggregates : facts.externals).add(v.name, name);
+    const aggregate = via.find((v) => v.type === 'aggregate');
+    for (const r of rules) facts.rules.add(aggregate!.name, r.text);
   };
   const steps = (event: string, list: Step[]) => {
     for (const s of list) {
@@ -60,7 +64,7 @@ function collect(board: Board): Facts {
         continue;
       }
       produce(s.event);
-      command(s.command, s.via);
+      command(s.command, s.via, s.rules);
       hotspots(s.hotspots, s.command);
       steps(s.event, s.reactions);
     }
@@ -84,7 +88,7 @@ function collect(board: Board): Facts {
         break;
       case 'flow':
         produce(item.event);
-        command(item.command, item.via);
+        command(item.command, item.via, item.rules);
         facts.actors.add(
           item.actor ?? (item.schedule !== undefined ? `Every ${item.schedule}` : 'Unknown actor'),
           item.command,
@@ -124,6 +128,7 @@ export function summarize(board: Board): string {
     ),
     part('Actors', facts.actors.lines(), 'Commands each actor or schedule issues.'),
     part('Aggregates', facts.aggregates.lines(), 'Commands each aggregate handles.'),
+    part('Rules', facts.rules.lines(), 'Business rules each aggregate enforces.'),
     part('External systems', facts.externals.lines(), 'Commands that go through each external system.'),
     part(
       'Events nothing reacts to',

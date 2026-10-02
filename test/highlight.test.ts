@@ -62,6 +62,7 @@ describe('tokenize', () => {
   it('marks whole-line statements', () => {
     expect(tokens('# note')).toEqual([['comment', '# note']]);
     expect(tokens('  ! Why?')).toEqual([['hotspot', '! Why?']]);
+    expect(tokens('  * Never overbooked')).toEqual([['rule', '* Never overbooked']]);
     expect(tokens('{Cart}')).toEqual([['read-model', '{Cart}']]);
     expect(tokens('== Sales ==')).toEqual([['section', '== Sales ==']]);
   });

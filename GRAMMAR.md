@@ -28,6 +28,7 @@ Customer: Submit ticket -> (Ticket) -> TicketSubmitted
 | `{Name}`                                   | read model          | green                |
 | last chain item, or a name on its own line | event               | orange               |
 | `! text`                                   | hotspot             | red                  |
+| `* text`                                   | rule, in aggregate  | (aggregate's yellow) |
 | `== Name ==`                               | section (lane)      | white lane, grey gap |
 
 ## Statements
@@ -130,6 +131,18 @@ Indentation doesn't change the cause; indent under the step for readability.
 ! text
 ```
 
+**Rule** — a business rule (invariant) the aggregate of the nearest flow or
+reaction above enforces, such as "a room is never double-booked". It is
+listed under the aggregate's name, in that row's aggregate sticky, which
+grows to fit. Like a hotspot, indentation doesn't change which step it
+belongs to; indent under the step for readability. The step must have
+exactly one `(Aggregate)`.
+
+```
+Guest: Book room -> (Booking) -> RoomBooked
+  * A room is never double-booked
+```
+
 **Comment / blank** — ignored.
 
 ```
@@ -156,12 +169,13 @@ Whitespace around `->` is ignored. Item text is trimmed and may contain spaces.
 
 ```ebnf
 document   = { line , newline } ;
-line       = blank | comment | hotspot | read-model | flow | reaction
+line       = blank | comment | hotspot | rule | read-model | flow | reaction
            | when | after | schedule | section | event ;
 
 blank      = { " " } ;
 comment    = indent , "#" , text ;
 hotspot    = indent , "!" , text ;
+rule       = indent , "*" , text ;
 read-model = indent , "{" , name , "}" ;
 flow       = [ name , ":" ] , name , chain ;
 reaction   = indent , "then" , " " , name , chain ;
@@ -227,6 +241,10 @@ its line). See `src/parser.ts` for the types. For the example above:
 Read models are moved into `informedBy` of the statement they precede.
 A read model with no following flow or reaction is an error.
 
+Rules go into `rules` of their flow or reaction
+(`{ "type": "rule", "text": "...", "line": 8 }`), empty when there are none;
+the examples above leave the empty ones out.
+
 Hotspots go into `hotspots` of the flow or reaction that caused them. Board
 and section hotspots are top-level, in source order with the flows.
 
@@ -261,6 +279,7 @@ Lines
 - `unrecognised line`
 - `invalid actor: A(x)`
 - `empty hotspot`
+- `empty rule`
 - `empty section name`
 
 Indentation
@@ -286,6 +305,9 @@ Chains
 Structure
 
 - `read model {Backlog} informs nothing`
+- `rule must follow a flow or reaction`
+- `rule needs an (Aggregate) in its step`
+- `rule is ambiguous: step has several aggregates`
 - `hotspot must follow a flow or reaction, not 'when'` (also `'after'`)
 - `'when' has no reactions` (also `'after'`)
 - `'when' expects an event name, got (Ticket)` (also `'unless'`)

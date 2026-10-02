@@ -31,6 +31,7 @@ export const TOKEN_TYPES = [
   'readModel',
   'schedule',
   'hotspot',
+  'rule',
 ] as const;
 
 const TYPE_OF: Record<TokenKind, (typeof TOKEN_TYPES)[number]> = {
@@ -48,6 +49,7 @@ const TYPE_OF: Record<TokenKind, (typeof TOKEN_TYPES)[number]> = {
   'read-model': 'readModel',
   schedule: 'schedule',
   hotspot: 'hotspot',
+  rule: 'rule',
 };
 
 interface Message {

@@ -66,6 +66,40 @@ describe('layout', () => {
     });
   });
 
+  describe('rules', () => {
+    const many = [
+      '  * Rooms are never double-booked for a night',
+      '  * A stay lasts at least one night',
+      '  * Only guests over 18 may book',
+    ];
+    const { stickies, arrows } = board('A: Book -> (Booking) -> Booked', ...many, '  then Pay -> Paid');
+
+    it('lists rules in the aggregate, which grows to fit them', () => {
+      const agg = find(stickies, 'Booking', 'aggregate');
+      expect(agg.rules).toEqual([
+        'Rooms are never double-booked for a night',
+        'A stay lasts at least one night',
+        'Only guests over 18 may book',
+      ]);
+      expect(agg.h).toBeGreaterThan(find(stickies, 'Booked').h);
+    });
+
+    it('pushes the next row below the tall aggregate', () => {
+      const agg = find(stickies, 'Booking', 'aggregate');
+      expect(find(stickies, 'whenever Booked').y).toBeGreaterThan(agg.y + agg.h);
+    });
+
+    it('routes reaction arrows below the tall aggregate', () => {
+      const agg = find(stickies, 'Booking', 'aggregate');
+      const branch = arrows.find((a) => a.length > 2)!;
+      expect(branch[1]![1]).toBeGreaterThan(agg.y + agg.h);
+    });
+
+    it('keeps aggregates without rules plain', () => {
+      expect(find(board('A: Do -> (X) -> Done').stickies, 'X')).not.toHaveProperty('rules');
+    });
+  });
+
   describe('events on their own', () => {
     it('puts consecutive events on one row, without arrows', () => {
       const { stickies, arrows } = board('Placed', 'Paid', 'Shipped');

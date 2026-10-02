@@ -39,6 +39,7 @@ describe('parse', () => {
         command: 'Submit ticket',
         via: [{ type: 'aggregate', name: 'Ticket' }],
         event: 'TicketSubmitted',
+        rules: [],
         hotspots: [],
         reactions: [
           {
@@ -48,6 +49,7 @@ describe('parse', () => {
             command: 'Fetch customer details',
             via: [{ type: 'external', name: 'CRM' }],
             event: 'CustomerDetailsFetched',
+            rules: [],
             hotspots: [],
             reactions: [],
           },
@@ -58,6 +60,7 @@ describe('parse', () => {
             command: 'Assign by topic',
             via: [{ type: 'aggregate', name: 'Ticket' }],
             event: 'TicketAssigned',
+            rules: [],
             hotspots: [{ type: 'hotspot', text: 'Who owns the topic → department mapping?', line: 7 }],
             reactions: [],
           },
@@ -77,6 +80,7 @@ describe('parse', () => {
           command: 'Submit ticket',
           via: [],
           event: 'TicketSubmitted',
+          rules: [],
           hotspots: [],
           reactions: [],
         },
@@ -137,6 +141,28 @@ describe('parse', () => {
     it('gives a hotspot to the nearest step above', () => {
       expect(flow.hotspots.map((h) => h.text)).toEqual(['caused by Do']);
       expect((flow.reactions[0] as Reaction).hotspots.map((h) => h.text)).toEqual(['caused by B, despite indent']);
+    });
+  });
+
+  describe('rules', () => {
+    const [flow] = parse(
+      lines(
+        'A: Book -> (Booking) -> Booked',
+        '  * No overlapping bookings',
+        '  ! Who decides?',
+        '*At least one night',
+        '  then Pay -> [PSP] -> (Booking) -> Paid',
+        '    * Deposit before check-in',
+      ),
+    ) as Flow[];
+
+    it('gives a rule to the nearest step above, whatever the indent', () => {
+      expect(flow!.rules).toEqual([
+        { type: 'rule', text: 'No overlapping bookings', line: 2 },
+        { type: 'rule', text: 'At least one night', line: 4 },
+      ]);
+      expect(flow!.hotspots.map((h) => h.text)).toEqual(['Who decides?']);
+      expect((flow!.reactions[0] as Reaction).rules.map((r) => r.text)).toEqual(['Deposit before check-in']);
     });
   });
 
@@ -286,6 +312,13 @@ describe('parse', () => {
       lines('A: Do -> Done', '  after 1 day', '  ! Why?', '    then B -> BDone'),
     ],
     [1, 'chain must end with an event', 'every day: Archive'],
+    [2, 'empty rule', lines('A: Do -> (Agg) -> Done', '  *')],
+    [1, 'rule must follow a flow or reaction', '* Rule'],
+    [2, 'rule must follow a flow or reaction', lines('Done', '* Rule')],
+    [3, 'rule must follow a flow or reaction', lines('A: Do -> Done', 'when Done', '* Rule', '  then B -> BDone')],
+    [3, 'rule must follow a flow or reaction', lines('A: Do -> (Agg) -> Done', '== S ==', '* Rule')],
+    [2, 'rule needs an (Aggregate) in its step', lines('A: Do -> [Ext] -> Done', '  * Rule')],
+    [2, 'rule is ambiguous: step has several aggregates', lines('A: Do -> (X) -> (Y) -> Done', '  * Rule')],
     [
       3,
       "hotspot must follow a flow or reaction, not 'when'",
