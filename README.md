@@ -79,6 +79,11 @@ sticky to jump to its line, open and save `.estorm` files, export SVG,
 switch to the [timeline view](GRAMMAR.md#timeline-view) and open a summary of lint warnings, actors, aggregates, context
 dependencies, gaps and hotspots.
 
+**Share** copies a link that opens the board for anyone. The board is
+compressed into the link's `#` fragment, which browsers never send to a
+server, so it is not uploaded anywhere. Links from the downloaded file
+point to the hosted editor.
+
 **Try it:** <https://ville6000.github.io/estorm/>, updated on each release.
 
 **Install:** download `estorm.html` from the

@@ -30,6 +30,7 @@ import {
   type Warning,
 } from '../src/index.ts';
 import { tokenize } from '../src/highlight.ts';
+import { decode, encode } from './share.ts';
 
 // File System Access API: Chromium only, so feature-detected.
 interface FileHandle {
@@ -49,6 +50,8 @@ const PICKER_TYPES = [{ description: 'estorm board', accept: { 'text/plain': ['.
 const DRAFT_KEY = 'estorm:draft';
 const VIM_KEY = 'estorm:vim';
 const TIMELINE_KEY = 'estorm:timeline';
+// Where links from the downloaded file point, since file:// links don't work for others.
+const PUBLIC_URL = 'https://ville6000.github.io/estorm/';
 const ZOOMS = [0.25, 0.33, 0.5, 0.67, 0.8, 1, 1.25, 1.5, 2];
 
 const examples = Object.fromEntries(
@@ -518,15 +521,32 @@ function togglePanel(panel: HTMLElement): void {
 helpButton.addEventListener('click', () => togglePanel(cheatsheet));
 summaryButton.addEventListener('click', () => togglePanel(summaryPanel));
 
+/** Shows TEXT on BUTTON for a moment, then its label again. */
+function flash(button: HTMLButtonElement, text: string): void {
+  const label = button.dataset.label ?? (button.dataset.label = button.textContent ?? '');
+  button.textContent = text;
+  setTimeout(() => (button.textContent = label), 1500);
+}
+
+$('share').addEventListener('click', async (e) => {
+  const button = e.currentTarget as HTMLButtonElement;
+  const base = location.protocol === 'file:' ? PUBLIC_URL : location.origin + location.pathname;
+  try {
+    await navigator.clipboard.writeText(`${base}#${await encode({ name: state.name, text: sourceText() })}`);
+    flash(button, 'Link copied');
+  } catch {
+    flash(button, 'Copy failed');
+  }
+});
+
 $('copy-summary').addEventListener('click', async (e) => {
   const button = e.currentTarget as HTMLButtonElement;
   try {
     await navigator.clipboard.writeText(state.summary);
-    button.textContent = 'Copied';
+    flash(button, 'Copied');
   } catch {
-    button.textContent = 'Copy failed';
+    flash(button, 'Copy failed');
   }
-  setTimeout(() => (button.textContent = 'Copy Markdown'), 1500);
 });
 
 for (const name of Object.keys(examples).sort()) {
@@ -545,6 +565,21 @@ vimButton.setAttribute('aria-pressed', String(state.vim));
 state.timeline = storage(() => localStorage.getItem(TIMELINE_KEY) === '1') ?? false;
 timelineButton.setAttribute('aria-pressed', String(state.timeline));
 
+/**
+ * Opens the board in the URL's fragment, if any, then drops the fragment so a
+ * reload opens the draft.
+ */
+async function openShared(): Promise<void> {
+  const shared = await decode(location.hash);
+  if (!shared) return;
+  window.history.replaceState(null, '', location.pathname + location.search);
+  if (shared.text !== sourceText() && !confirmDiscard()) return;
+  load(shared.text, shared.name, null, '');
+  zoomToFit();
+}
+
+window.addEventListener('hashchange', () => void openShared());
+
 const draft = storage(() => JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null')) as
   { name: string; text: string } | null | undefined;
 if (draft && typeof draft.text === 'string') {
@@ -553,3 +588,4 @@ if (draft && typeof draft.text === 'string') {
   load(examples['checkout.estorm'] ?? '', 'checkout.estorm', null);
   zoomToFit();
 }
+void openShared();
