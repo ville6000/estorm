@@ -63,7 +63,7 @@ The full notation, with every rule and error message, is in
 
 For drawing boards. Edit on the left, see the board on the right, click a
 sticky to jump to its line, open and save `.estorm` files, export SVG,
-and open a summary of lint warnings, actors, aggregates, context
+switch to the [timeline view](GRAMMAR.md#timeline-view) and open a summary of lint warnings, actors, aggregates, context
 dependencies, gaps and hotspots.
 
 **Try it:** <https://ville6000.github.io/estorm/>, updated on each release.
@@ -94,6 +94,7 @@ npm install -g @villev/estorm
 estorm render board.estorm        # writes board.svg
 estorm render docs/*.estorm       # one SVG next to each file
 estorm render board.estorm -o -   # SVG to stdout
+estorm render -t board.estorm     # timeline view, to board.timeline.svg
 estorm check docs/*.estorm        # errors only, for CI
 estorm lint docs/*.estorm         # errors and modelling warnings
 estorm summary board.estorm       # actors, aggregates, gaps, hotspots
@@ -161,9 +162,10 @@ npm install @villev/estorm
 **Use:**
 
 ```ts
-import { parse, layout, svg, render, summarize, lint, ParseError } from '@villev/estorm';
+import { parse, layout, svg, render, renderTimeline, summarize, lint, ParseError } from '@villev/estorm';
 
 const doc = render(text); // parse -> layout -> svg
+const events = renderTimeline(text); // parse -> timeline -> svg
 const prose = summarize(parse(text)); // Markdown overview
 const warnings = lint(parse(text)); // [{ line, message }]
 ```

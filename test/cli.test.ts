@@ -30,6 +30,13 @@ describe('cli', () => {
     expect(stdout).toMatch(/^<svg/);
   });
 
+  it('renders the timeline next to the input', () => {
+    const file = fixture('A: Do -> Done');
+    const { status } = run('render', '--timeline', file);
+    expect(status).toBe(0);
+    expect(readFileSync(file.replace(/\.estorm$/, '.timeline.svg'), 'utf8')).toMatch(/^<svg/);
+  });
+
   it('reports errors as file:line: message', () => {
     const file = fixture('A: Do -> Done\n  then Oops');
     const { status, stderr } = run('check', file);
