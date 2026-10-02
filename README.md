@@ -43,6 +43,7 @@ Text fits what comes after the workshop:
 | ---------------------------------------------- | --------------------------------- | ----------------------------- |
 | Capture a workshop, or model alone             | [Browser editor](#browser-editor) | Nothing: download one file    |
 | Render, check or lint boards from the terminal | [Command line](#command-line)     | `npm install -g`, Node.js 22+ |
+| Write boards in VS Code                        | [Editor support](#editor-support) | The VS Code extension         |
 | Write boards in Neovim or another LSP editor   | [Editor support](#editor-support) | The command line              |
 | Render boards in CI                            | [Docker and CI](#docker-and-ci)   | Docker                        |
 | Render boards from JavaScript or TypeScript    | [Library](#library)               | `npm install`                 |
@@ -130,7 +131,12 @@ lint warnings as you type, highlights for the event under the cursor, and
 completion of keywords and of the events, aggregates, externals and actors
 already on the board.
 
-**Install:** install the [command line](#command-line); it includes the
+**VS Code:** install
+[estorm for VS Code](https://marketplace.visualstudio.com/items?itemName=villev.estorm)
+from the Marketplace. It bundles the language server and adds a live
+preview of the board; nothing else to install.
+
+**Other editors:** install the [command line](#command-line); it includes the
 language server, `estorm lsp`, for any editor that speaks LSP. Setup for
 Neovim is in [EDITORS.md](EDITORS.md).
 

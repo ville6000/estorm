@@ -18,6 +18,15 @@ works offline:
 npm install -g @villev/estorm
 ```
 
+## VS Code
+
+Install [estorm for VS Code](https://marketplace.visualstudio.com/items?itemName=villev.estorm)
+from the Marketplace, or run `ext install villev.estorm` in Quick Open. It
+bundles the server, so the command line isn't needed, and adds a live
+preview of the board. Its
+[README](https://github.com/ville6000/estorm-vscode#readme) covers colours
+and settings.
+
 ## Neovim
 
 Neovim 0.11 or later:
