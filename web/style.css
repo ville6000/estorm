@@ -185,6 +185,10 @@ select:focus-visible {
   font-style: italic;
 }
 
+.tok-rule {
+  color: #946800;
+}
+
 .tok-hotspot {
   color: var(--error);
 }

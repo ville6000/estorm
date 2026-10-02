@@ -15,6 +15,13 @@ export interface Hotspot {
   line: number;
 }
 
+/** A business rule the aggregate of a flow or reaction enforces. */
+export interface Rule {
+  type: 'rule';
+  text: string;
+  line: number;
+}
+
 export interface Via {
   type: 'aggregate' | 'external';
   name: string;
@@ -35,6 +42,8 @@ export interface Flow extends Chain {
   actor?: string;
   /** When the command runs, e.g. "night at 02:00". Absent for an actor. */
   schedule?: string;
+  /** Rules its aggregate enforces. */
+  rules: Rule[];
   hotspots: Hotspot[];
   reactions: Step[];
 }
@@ -44,6 +53,8 @@ export interface Reaction extends Chain {
   type: 'reaction';
   line: number;
   informedBy: ReadModel[];
+  /** Rules its aggregate enforces. */
+  rules: Rule[];
   hotspots: Hotspot[];
   reactions: Step[];
 }
@@ -134,6 +145,7 @@ function parseChain(line: number, s: string): Chain {
 /** A source line, classified, with its indentation level. */
 type Stmt = { line: number; level: number } & (
   | { type: 'hotspot'; text: string }
+  | { type: 'rule'; text: string }
   | { type: 'section'; name: string }
   | { type: 'read-model'; name: string }
   | { type: 'when'; event: string }
@@ -164,6 +176,11 @@ function classify(n: number, raw: string): Stmt | null {
     const t = text.slice(1).trim();
     if (t === '') fail(n, 'empty hotspot');
     return { ...base, type: 'hotspot', text: t };
+  }
+  if (text.startsWith('*')) {
+    const t = text.slice(1).trim();
+    if (t === '') fail(n, 'empty rule');
+    return { ...base, type: 'rule', text: t };
   }
   if ((m = text.match(/^==\s*(.*?)\s*==$/))) {
     if (m[1] === '') fail(n, 'empty section name');
@@ -262,6 +279,17 @@ function collect(acc: Acc, stmt: Stmt): Acc {
       } else step.hotspots.push(hotspot);
       return acc;
     }
+    case 'rule': {
+      const step = acc.current === null ? undefined : acc.steps[acc.current]!;
+      if (step?.type !== 'flow' && step?.type !== 'reaction') {
+        fail(stmt.line, 'rule must follow a flow or reaction');
+      }
+      const aggregates = step.via.filter((v) => v.type === 'aggregate').length;
+      if (aggregates === 0) fail(stmt.line, 'rule needs an (Aggregate) in its step');
+      if (aggregates > 1) fail(stmt.line, 'rule is ambiguous: step has several aggregates');
+      step.rules.push({ type: 'rule', text: stmt.text, line: stmt.line });
+      return acc;
+    }
     case 'section': {
       if (acc.pending[0]) dangling(acc.pending[0]);
       acc.board.push({ type: 'section', name: stmt.name, line: stmt.line });
@@ -297,6 +325,7 @@ function collect(acc: Acc, stmt: Stmt): Acc {
         ...rest,
         level,
         informedBy: acc.pending.map(({ level: _, ...rm }) => rm),
+        rules: [],
         hotspots: [],
         reactions: [],
       } as Flat);

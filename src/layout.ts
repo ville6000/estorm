@@ -7,6 +7,7 @@
  * event if the lane is free there.
  */
 import type { After, Board, Event, Flow, Hotspot, Reaction, Step, When } from './parser.ts';
+import { ruled } from './text.ts';
 
 export const STICKY_W = 150;
 export const STICKY_H = 100;
@@ -30,6 +31,8 @@ export interface Sticky {
   y: number;
   w: number;
   h: number;
+  /** Business rules an aggregate enforces, listed under its name. */
+  rules?: string[];
 }
 
 export type Point = [number, number];
@@ -75,6 +78,11 @@ function colX(col: number): number {
   return col * (STICKY_W + GAP_X);
 }
 
+/** Bottom of the row that sticky S is on: rules can make an aggregate taller than the rest. */
+function rowBottom(stickies: Sticky[], s: Sticky): number {
+  return Math.max(...stickies.filter((o) => o.y === s.y).map((o) => o.y + o.h));
+}
+
 /** Straight arrow from the right side of A to the left side of B. */
 function arrow(a: Sticky, b: Sticky): Path {
   const y = a.y + 0.5 * STICKY_H;
@@ -85,15 +93,15 @@ function arrow(a: Sticky, b: Sticky): Path {
 }
 
 /**
- * Elbow arrow from the bottom of event E into POLICY, whose row starts at
- * GROUP_X (read models touch the policy on its left). A policy on the next
+ * Elbow arrow from the bottom of event E, whose row ends at BOTTOM, into
+ * POLICY, whose row starts at GROUP_X (read models touch the policy on its left). A policy on the next
  * row is entered straight from above; otherwise the arrow runs down a rail
  * left of the row, then over the row into the top of the policy. Sibling
  * reactions share the rail; OFFSET shifts the route so links run beside it.
  */
-function branch(e: Sticky, policy: Sticky, groupX: number, offset = 0): Path {
+function branch(e: Sticky, bottom: number, policy: Sticky, groupX: number, offset = 0): Path {
   const midX = e.x + 0.5 * STICKY_W + 2 * offset;
-  const below = e.y + STICKY_H + 0.5 * GAP_Y + offset;
+  const below = bottom + 0.5 * GAP_Y + offset;
   const above = policy.y - 0.5 * GAP_Y + offset;
   const px = policy.x + 0.5 * STICKY_W + 2 * offset;
   const rail = groupX - 0.5 * GAP_X - offset;
@@ -207,16 +215,22 @@ function placeRow(lane: LaneBoard, step: Flow | Reaction, x: number, trigger?: T
     start,
   );
   const placed = items.map(([kind, text, line], i) => sticky(kind, text, line, xs[i]!, y));
+  const rules = step.rules.map((r) => r.text);
+  const aggregate = placed.find((s) => s.kind === 'aggregate');
+  if (aggregate && rules.length) {
+    aggregate.rules = rules;
+    aggregate.h = Math.max(STICKY_H, ruled(aggregate.text, rules, aggregate.w).height);
+  }
   const event = placed.at(-1)!;
   const hotspots = step.hotspots.map((h: Hotspot, i) => sticky('hotspot', h.text, h.line, event.x + colX(i + 1), y));
   lane.stickies.push(...placed, ...hotspots);
   lane.arrows.push(...flowArrows(placed));
-  lane.y += STICKY_H + GAP_Y;
+  lane.y += Math.max(...placed.map((s) => s.h)) + GAP_Y;
 
   if (trigger) {
     const policy = placed[step.informedBy.length]!;
     if (trigger.sticky) {
-      lane.arrows.push(branch(trigger.sticky, policy, start));
+      lane.arrows.push(branch(trigger.sticky, rowBottom(lane.stickies, trigger.sticky), policy, start));
     } else {
       lane.pendingLinks.push({ event: trigger.text, policy, groupX: start, kind: 'link' });
     }
@@ -364,7 +378,7 @@ function shift(dx: number, lane: LaneBoard): LaneBoard {
 /** Elbow arrow from the first event sticky named EVENT into POLICY. Cancel links run beside 'when' links. */
 function link(stickies: Sticky[], { event, policy, groupX, kind }: PendingLink): Path {
   const e = stickies.find((s) => s.kind === 'event' && s.text === event)!;
-  return branch(e, policy, groupX, kind === 'cancel' ? -6 : 6);
+  return branch(e, rowBottom(stickies, e), policy, groupX, kind === 'cancel' ? -6 : 6);
 }
 
 const MAX_PASSES = 10;

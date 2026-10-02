@@ -39,6 +39,7 @@ and never go stale on a whiteboard photo.
 | `when Event`                             | policy reacting to an event by name                     |
 | `== Context ==`                          | bounded context, drawn as a lane                        |
 | `! Question?`                            | hotspot                                                 |
+| `* Rule`                                 | business rule, listed in the aggregate above            |
 | `# comment`                              | ignored                                                 |
 
 The full notation, with every rule and error message, is in

@@ -6,7 +6,7 @@
  */
 import type { Kind } from './layout.ts';
 
-export type TokenKind = Kind | 'comment' | 'section' | 'keyword' | 'arrow' | 'punct';
+export type TokenKind = Kind | 'rule' | 'comment' | 'section' | 'keyword' | 'arrow' | 'punct';
 export interface Token {
   kind: TokenKind;
   from: number;
@@ -42,6 +42,8 @@ export function tokenize(line: string): Token[] {
     add('comment', start, line.length);
   } else if (rest.startsWith('!')) {
     add('hotspot', start, line.length);
+  } else if (rest.startsWith('*')) {
+    add('rule', start, line.length);
   } else if (rest.startsWith('{')) {
     add('read-model', start, line.length);
   } else if (rest.startsWith('==')) {

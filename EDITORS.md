@@ -6,7 +6,7 @@ errors as you type, and highlights every mention of the event under the
 cursor.
 
 Token types are named after the stickies: `actor`, `command`, `aggregate`,
-`external`, `event`, `readModel`, `schedule`, `hotspot` and `section`, plus
+`external`, `event`, `readModel`, `schedule`, `hotspot`, `rule` and `section`, plus
 the standard `comment`, `keyword` and `operator`. Most themes colour only
 the standard ones, so give the others colours yourself.
 
@@ -26,6 +26,7 @@ for type, hl in pairs({
   schedule = { fg = '#6741d9' },
   external = { italic = true },
   hotspot = { fg = '#c92a2a' },
+  rule = { fg = '#946800' },
   section = { bold = true },
 }) do
   vim.api.nvim_set_hl(0, '@lsp.type.' .. type .. '.estorm', hl)

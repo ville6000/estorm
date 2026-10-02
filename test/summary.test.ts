@@ -38,6 +38,18 @@ describe('summarize', () => {
     expect(out).toContain('- Email: Remind, Report\n');
   });
 
+  it('lists rules by aggregate', () => {
+    const text = [
+      'A: Borrow -> [Catalog] -> (Loan) -> Borrowed',
+      '  * At most 5 loans',
+      '  then Renew -> (Loan) -> Renewed',
+      '    * Renew twice at most',
+    ].join('\n');
+    expect(summary(text)).toContain(
+      '## Rules\n\nBusiness rules each aggregate enforces.\n\n- Loan: At most 5 loans, Renew twice at most\n',
+    );
+  });
+
   it('lists events nothing reacts to', () => {
     const out = summary('Started\nA: Do -> Done\n  then React -> Reacted\nwhen Started\n  then Go -> Gone');
     expect(out).toContain('## Events nothing reacts to');
