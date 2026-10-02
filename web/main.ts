@@ -477,8 +477,13 @@ $('new').addEventListener('click', () => {
 $('open').addEventListener('click', () => void open());
 $('save').addEventListener('click', () => void save());
 $('save-as').addEventListener('click', () => void saveAs());
-$('export').addEventListener('click', exportSvg);
-$('export-png').addEventListener('click', () => void exportPng());
+const exportPicker = $<HTMLSelectElement>('export');
+exportPicker.addEventListener('change', () => {
+  const format = exportPicker.value;
+  exportPicker.value = '';
+  if (format === 'svg') exportSvg();
+  else if (format === 'png') void exportPng();
+});
 $('zoom-in').addEventListener('click', () => zoomBy(1));
 $('zoom-out').addEventListener('click', () => zoomBy(-1));
 $('zoom-reset').addEventListener('click', () => {
