@@ -17,7 +17,7 @@ import {
 } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, insertNewlineKeepIndent } from '@codemirror/commands';
 import { vim, Vim } from '@replit/codemirror-vim';
-import { layout, parse, ParseError, summarize, svg } from '../src/index.ts';
+import { layout, lint, parse, ParseError, summarize, svg, type Warning } from '../src/index.ts';
 import { tokenize } from '../src/highlight.ts';
 
 // File System Access API: Chromium only, so feature-detected.
@@ -56,6 +56,7 @@ const helpButton = $<HTMLButtonElement>('help');
 const vimButton = $<HTMLButtonElement>('vim');
 const summaryPanel = $<HTMLElement>('summary');
 const summaryBody = $<HTMLDivElement>('summary-body');
+const warningList = $<HTMLDivElement>('warnings');
 const summaryButton = $<HTMLButtonElement>('summary-toggle');
 
 const state = {
@@ -99,6 +100,15 @@ function summaryHtml(markdown: string): string {
     .join('');
 }
 
+/** Lint warnings as a heading and a list of buttons that jump to their lines. */
+function warningsHtml(warnings: Warning[]): string {
+  if (!warnings.length) return '';
+  const items = warnings
+    .map((w) => `<li><button type="button" data-line="${w.line}">line ${w.line}: ${escape(w.message)}</button></li>`)
+    .join('');
+  return `<h3>Warnings (${warnings.length})</h3><ul>${items}</ul>`;
+}
+
 function renderBoard(): void {
   const text = sourceText();
   try {
@@ -107,6 +117,9 @@ function renderBoard(): void {
     board.innerHTML = svg(l);
     state.summary = summarize(ast);
     summaryBody.innerHTML = summaryHtml(state.summary);
+    const warnings = lint(ast);
+    warningList.innerHTML = warningsHtml(warnings);
+    summaryButton.textContent = warnings.length ? `Summary (${warnings.length})` : 'Summary';
     summaryPanel.classList.remove('stale');
     state.size = { width: l.width, height: l.height };
     state.errorLine = null;
@@ -285,6 +298,11 @@ Vim.defineEx('saveas', 'sav', () => void saveAs());
 board.addEventListener('click', (e) => {
   const g = (e.target as Element).closest('[data-line]');
   if (g) goToLine(Number(g.getAttribute('data-line')));
+});
+
+warningList.addEventListener('click', (e) => {
+  const button = (e.target as Element).closest('[data-line]');
+  if (button) goToLine(Number(button.getAttribute('data-line')));
 });
 
 errorBar.addEventListener('click', () => {

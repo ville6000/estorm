@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 /**
- * estorm command line: render boards to SVG, check them in CI, summarise
- * them, or preview one live in the browser while editing it.
+ * estorm command line: render boards to SVG, check or lint them in CI,
+ * summarise them, or preview one live in the browser while editing it.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { parseArgs } from 'node:util';
-import { parse, ParseError, render, summarize } from './index.ts';
+import { lint, parse, ParseError, render, summarize } from './index.ts';
 import { serveStdio } from './lsp.ts';
 
 const USAGE = `Usage:
   estorm render <file.estorm>...         write <file>.svg next to each file
   estorm render <file.estorm> -o <out>   write to <out> ('-' for stdout)
   estorm check <file.estorm>...          report errors only
+  estorm lint <file.estorm>...           errors and modelling warnings
   estorm summary <file.estorm>...        overview: actors, aggregates, gaps, hotspots
   estorm serve <file.estorm> [-p 8080]   live preview at http://localhost:8080
   estorm lsp                             language server over stdio, for editors
@@ -79,6 +80,22 @@ function check(files: string[]): number {
   const errors = files.map((f) => compile(f)).filter((r) => 'error' in r);
   for (const r of errors) console.error(r.error);
   return errors.length ? 1 : 0;
+}
+
+function lintFiles(files: string[]): number {
+  if (files.length === 0) throw new UsageError('lint needs at least one file');
+  let failed = 0;
+  for (const file of files) {
+    const result = compile(file, (text) =>
+      lint(parse(text))
+        .map((w) => `${file}:${w.line}: ${w.message}\n`)
+        .join(''),
+    );
+    const out = 'error' in result ? `${result.error}\n` : result.out;
+    if (out) failed++;
+    process.stderr.write(out);
+  }
+  return failed ? 1 : 0;
 }
 
 function summary(files: string[]): number {
@@ -204,6 +221,8 @@ async function main(argv: string[]): Promise<number> {
       return renderFiles(files, values.out);
     case 'check':
       return check(files);
+    case 'lint':
+      return lintFiles(files);
     case 'summary':
       return summary(files);
     case 'serve': {
