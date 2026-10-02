@@ -55,3 +55,28 @@ describe('svg', () => {
     expect(doc).toContain('class="cancel"');
   });
 });
+
+describe('themes', () => {
+  const text = '== Sales ==\nA: Do -> Done\n== Billing ==\nwhen Done\n  then B -> BDone';
+
+  it('is light by default, without a stylesheet', () => {
+    const doc = render(text);
+    expect(doc).toContain('class="background" width="100%" height="100%" fill="#ffffff"');
+    expect(doc).not.toContain('<style');
+  });
+
+  it('draws dark boards with the same sticky colours', () => {
+    const doc = render(text, { theme: 'dark' });
+    expect(doc).toContain('fill="#1a1b1e"');
+    expect(doc).toContain('fill="#ffa94d"');
+    expect(doc).not.toContain('<style');
+  });
+
+  it('follows the colour scheme on auto, scoped to the board', () => {
+    const doc = render(text, { theme: 'auto' });
+    expect(doc).toContain('class="estorm"');
+    expect(doc).toContain('fill="#ffffff"');
+    expect(doc).toContain('@media (prefers-color-scheme: dark)');
+    expect(doc).toContain('.estorm .background { fill: #1a1b1e }');
+  });
+});

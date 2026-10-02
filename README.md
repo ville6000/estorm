@@ -107,6 +107,7 @@ estorm render board.estorm        # writes board.svg
 estorm render docs/*.estorm       # one SVG next to each file
 estorm render board.estorm -o -   # SVG to stdout
 estorm render -t board.estorm     # timeline view, to board.timeline.svg
+estorm render board.estorm --theme auto   # dark when the viewer's is (also: light, dark)
 estorm check docs/*.estorm        # errors only, for CI
 estorm lint docs/*.estorm         # errors and modelling warnings
 estorm summary board.estorm       # actors, aggregates, gaps, hotspots
@@ -177,6 +178,7 @@ npm install @villev/estorm
 import { parse, layout, svg, render, renderTimeline, summarize, lint, ParseError } from '@villev/estorm';
 
 const doc = render(text); // parse -> layout -> svg
+const dark = render(text, { theme: 'dark' }); // or 'auto': follows prefers-color-scheme
 const events = renderTimeline(text); // parse -> timeline -> svg
 const prose = summarize(parse(text)); // Markdown overview
 const warnings = lint(parse(text)); // [{ line, message }]

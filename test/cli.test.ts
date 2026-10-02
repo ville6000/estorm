@@ -30,6 +30,18 @@ describe('cli', () => {
     expect(stdout).toMatch(/^<svg/);
   });
 
+  it('renders in the theme asked for', () => {
+    const { status, stdout } = run('render', fixture('A: Do -> Done'), '--theme', 'dark', '-o', '-');
+    expect(status).toBe(0);
+    expect(stdout).toContain('fill="#1a1b1e"');
+  });
+
+  it('rejects unknown themes', () => {
+    const { status, stderr } = run('render', fixture('A: Do -> Done'), '--theme', 'sepia');
+    expect(status).toBe(2);
+    expect(stderr).toContain('invalid theme: sepia');
+  });
+
   it('renders the timeline next to the input', () => {
     const file = fixture('A: Do -> Done');
     const { status } = run('render', '--timeline', file);

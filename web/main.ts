@@ -133,7 +133,7 @@ function renderBoard(): void {
   try {
     const ast = parse(text);
     const l = boardLayout(ast);
-    board.innerHTML = svg(l);
+    board.innerHTML = svg(l, { theme: 'auto' });
     state.summary = summarize(ast);
     summaryBody.innerHTML = summaryHtml(state.summary);
     const warnings = lint(ast);
@@ -400,10 +400,11 @@ async function save(): Promise<void> {
   renderBoard();
 }
 
-/** The board as SVG, or null after telling the user to fix the parse error first. */
+/** The board as SVG in the theme on screen, or null after telling the user to fix the parse error first. */
 function boardSvg(): string | null {
+  const theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   try {
-    return svg(boardLayout(parse(sourceText())));
+    return svg(boardLayout(parse(sourceText())), { theme });
   } catch (e) {
     if (!(e instanceof ParseError)) throw e;
     alert(`Fix the error first: line ${e.line}: ${e.message}`);

@@ -8,8 +8,46 @@
   --error-bg: #ffe3e3;
   --error: #c92a2a;
   --warning: #c25e00;
+  --error-border: #ffc9c9;
+  --editor-bg: #fbfaf7;
+  --gutter-bg: #f3f2ee;
+  --selection: #d7d4f0;
+  --tok-command: #1864ab;
+  --tok-event: #a33b0b;
+  --tok-event-bg: #ffe8cc;
+  --tok-match-bg: #ffd8a8;
+  --tok-match-ring: #ff922b;
+  --tok-keyword: #6741d9;
+  --tok-rule: #946800;
+  --shadow: rgb(0 0 0 / 0.12);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  color-scheme: light;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101113;
+    --panel: #1a1b1e;
+    --border: #373a40;
+    --text: #dee2e6;
+    --muted: #909296;
+    --accent: #339af0;
+    --error-bg: #3b1f22;
+    --error: #ff8787;
+    --warning: #ffa94d;
+    --error-border: #5c2b2f;
+    --editor-bg: #1a1b1e;
+    --gutter-bg: #141517;
+    --selection: #3b3f5c;
+    --tok-command: #74c0fc;
+    --tok-event: #ffc078;
+    --tok-event-bg: rgb(255 146 43 / 0.15);
+    --tok-match-bg: rgb(255 146 43 / 0.35);
+    --tok-match-ring: #ff922b;
+    --tok-keyword: #b197fc;
+    --tok-rule: #ffd43b;
+    --shadow: rgb(0 0 0 / 0.5);
+  }
 }
 
 * {
@@ -118,11 +156,20 @@ select:focus-visible {
 .editor .cm-editor {
   height: 100%;
   color: var(--text);
-  background: #fbfaf7;
+  background: var(--editor-bg);
 }
 
 .editor .cm-editor.cm-focused {
   outline: none;
+}
+
+.editor .cm-cursor {
+  border-left-color: var(--text);
+}
+
+.editor .cm-selectionBackground,
+.editor .cm-focused .cm-selectionBackground {
+  background: var(--selection) !important;
 }
 
 .editor .cm-scroller {
@@ -140,7 +187,7 @@ select:focus-visible {
 .editor .cm-gutters {
   min-width: 3.5em;
   color: var(--muted);
-  background: #f3f2ee;
+  background: var(--gutter-bg);
   border-right: 1px solid var(--border);
 }
 
@@ -157,24 +204,24 @@ select:focus-visible {
    and commands echo their sticky colours (src/svg.ts COLORS); aggregates and
    read models are marked by their brackets alone. */
 .tok-command {
-  color: #1864ab;
+  color: var(--tok-command);
 }
 
 .tok-event {
-  color: #a33b0b;
-  background: #ffe8cc;
+  color: var(--tok-event);
+  background: var(--tok-event-bg);
   border-radius: 3px;
 }
 
 /* Every mention of the event under the cursor. */
 .tok-match {
-  background: #ffd8a8;
-  box-shadow: 0 0 0 1px #ff922b;
+  background: var(--tok-match-bg);
+  box-shadow: 0 0 0 1px var(--tok-match-ring);
 }
 
 .tok-keyword,
 .tok-schedule {
-  color: #6741d9;
+  color: var(--tok-keyword);
 }
 
 .tok-keyword {
@@ -186,7 +233,7 @@ select:focus-visible {
 }
 
 .tok-rule {
-  color: #946800;
+  color: var(--tok-rule);
 }
 
 .tok-hotspot {
@@ -209,7 +256,7 @@ select:focus-visible {
 
 .editor .cm-panels {
   font-family: var(--mono);
-  background: #f3f2ee;
+  background: var(--gutter-bg);
   border-color: var(--border);
 }
 
@@ -217,7 +264,7 @@ select:focus-visible {
   margin: 0;
   padding: 8px 12px;
   border: 0;
-  border-top: 1px solid #ffc9c9;
+  border-top: 1px solid var(--error-border);
   border-radius: 0;
   text-align: left;
   background: var(--error-bg);
@@ -241,8 +288,7 @@ select:focus-visible {
 
 .board svg {
   display: block;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+  box-shadow: 0 1px 3px var(--shadow);
 }
 
 .board svg g[data-line] {
@@ -258,7 +304,7 @@ select:focus-visible {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+  box-shadow: 0 4px 16px var(--shadow);
 }
 
 .panel h2 {

@@ -27,6 +27,62 @@ export const COLORS: Record<Kind, string> = {
   hotspot: '#ff6b6b',
 };
 
+/** 'auto' follows the viewer's prefers-color-scheme. */
+export type Theme = 'light' | 'dark' | 'auto';
+
+export interface SvgOptions {
+  theme?: Theme;
+}
+
+/** Colours of everything but the stickies, which keep theirs (and dark text) in both themes. */
+interface Palette {
+  background: string;
+  gap: string;
+  lane: string;
+  arrow: string;
+  link: string;
+  cancel: string;
+}
+
+const PALETTES: Record<'light' | 'dark', Palette> = {
+  light: {
+    background: '#ffffff',
+    gap: '#e9ecef',
+    lane: '#495057',
+    arrow: '#868e96',
+    link: '#495057',
+    cancel: '#e03131',
+  },
+  dark: {
+    background: '#1a1b1e',
+    gap: '#2c2e33',
+    lane: '#c1c2c5',
+    arrow: '#909296',
+    link: '#a6a7ab',
+    cancel: '#ff6b6b',
+  },
+};
+
+const STICKY_TEXT = '#212529';
+
+/** Dark overrides for theme 'auto', scoped to .estorm so an inlined SVG leaves the page alone. */
+function darkStyle(p: Palette): string {
+  return el(
+    'style',
+    {},
+    '@media (prefers-color-scheme: dark) {' +
+      ` .estorm .background { fill: ${p.background} }` +
+      ` .estorm .gap { fill: ${p.gap} }` +
+      ` .estorm .lane text { fill: ${p.lane} }` +
+      ` .estorm .arrow { stroke: ${p.arrow} }` +
+      ` .estorm .link { stroke: ${p.link} }` +
+      ` .estorm .cancel { stroke: ${p.cancel} }` +
+      ` .estorm #arrow path { fill: ${p.arrow} }` +
+      ` .estorm #cancel path { fill: ${p.cancel} }` +
+      ' }',
+  );
+}
+
 function escape(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -66,7 +122,7 @@ function centredText({ text, x, y, w, h }: Sticky): string {
   const top = y + 0.5 * h - 0.5 * (lines.length - 1) * LINE_HEIGHT + 0.35 * FONT_SIZE;
   return el(
     'text',
-    { x: cx, y: top, 'text-anchor': 'middle', 'font-size': FONT_SIZE, fill: '#212529' },
+    { x: cx, y: top, 'text-anchor': 'middle', 'font-size': FONT_SIZE, fill: STICKY_TEXT },
     lines.map((l, i) => el('tspan', { x: cx, dy: i === 0 ? 0 : LINE_HEIGHT }, escape(l))),
   );
 }
@@ -79,10 +135,10 @@ function ruledText({ text, rules, x, y, w }: Sticky): string[] {
   let ry = y + r.rulesY;
   const bullets = r.rules.map((lines) => {
     const out = el('g', { class: 'rule' }, [
-      el('text', { x: left, y: ry, 'font-size': RULE_FONT_SIZE, fill: '#212529' }, '•'),
+      el('text', { x: left, y: ry, 'font-size': RULE_FONT_SIZE, fill: STICKY_TEXT }, '•'),
       el(
         'text',
-        { x: left + BULLET_W, y: ry, 'font-size': RULE_FONT_SIZE, fill: '#212529' },
+        { x: left + BULLET_W, y: ry, 'font-size': RULE_FONT_SIZE, fill: STICKY_TEXT },
         lines.map((l, i) => el('tspan', { x: left + BULLET_W, dy: i === 0 ? 0 : RULE_LINE_HEIGHT }, escape(l))),
       ),
     ]);
@@ -98,7 +154,7 @@ function ruledText({ text, rules, x, y, w }: Sticky): string[] {
         'text-anchor': 'middle',
         'font-size': FONT_SIZE,
         'font-weight': 'bold',
-        fill: '#212529',
+        fill: STICKY_TEXT,
       },
       r.name.map((l, i) => el('tspan', { x: cx, dy: i === 0 ? 0 : LINE_HEIGHT }, escape(l))),
     ),
@@ -107,7 +163,7 @@ function ruledText({ text, rules, x, y, w }: Sticky): string[] {
       x2: x + w - PADDING,
       y1: y + r.dividerY,
       y2: y + r.dividerY,
-      stroke: '#212529',
+      stroke: STICKY_TEXT,
       'stroke-opacity': 0.3,
     }),
     ...bullets,
@@ -118,23 +174,24 @@ function pathD(points: Path): string {
   return 'M' + points.map(([x, y]) => `${x} ${y}`).join(' L');
 }
 
-function arrow(points: Path): string {
+function arrow(points: Path, p: Palette): string {
   return el('path', {
+    class: 'arrow',
     d: pathD(points),
     fill: 'none',
-    stroke: '#868e96',
+    stroke: p.arrow,
     'stroke-width': 1.5,
     'marker-end': 'url(#arrow)',
   });
 }
 
 /** Arrow of a 'when' reaction, dashed: it may cross a lane boundary. */
-function link(points: Path): string {
+function link(points: Path, p: Palette): string {
   return el('path', {
     class: 'link',
     d: pathD(points),
     fill: 'none',
-    stroke: '#495057',
+    stroke: p.link,
     'stroke-width': 1.5,
     'stroke-dasharray': '6 4',
     'marker-end': 'url(#arrow)',
@@ -142,27 +199,27 @@ function link(points: Path): string {
 }
 
 /** Arrow from the 'unless' event of an 'after' into the delayed policy: dotted red, it cancels the timer. */
-function cancel(points: Path): string {
+function cancel(points: Path, p: Palette): string {
   return el('path', {
     class: 'cancel',
     d: pathD(points),
     fill: 'none',
-    stroke: '#e03131',
+    stroke: p.cancel,
     'stroke-width': 1.5,
     'stroke-dasharray': '2 3',
     'marker-end': 'url(#cancel)',
   });
 }
 
-function gap({ x, y, w, h }: Rect): string {
-  return el('rect', { class: 'gap', x, y, width: w, height: h, fill: '#e9ecef' });
+function gap({ x, y, w, h }: Rect, p: Palette): string {
+  return el('rect', { class: 'gap', x, y, width: w, height: h, fill: p.gap });
 }
 
-function lane({ name, line, x, y }: Lane): string {
+function lane({ name, line, x, y }: Lane, p: Palette): string {
   return el('g', { class: 'lane', 'data-line': line }, [
     el(
       'text',
-      { x: x + LANE_PAD, y: y + LANE_LABEL_H, 'font-size': 15, 'font-weight': 'bold', fill: '#495057' },
+      { x: x + LANE_PAD, y: y + LANE_LABEL_H, 'font-size': 15, 'font-weight': 'bold', fill: p.lane },
       escape(name),
     ),
   ]);
@@ -184,33 +241,41 @@ function marker(id: string, color: string): string {
   );
 }
 
-const DEFS = el('defs', {}, [
-  marker('arrow', '#868e96'),
-  marker('cancel', '#e03131'),
-  el('filter', { id: 'shadow', x: '-10%', y: '-10%', width: '130%', height: '130%' }, [
-    el('feDropShadow', { dx: 2, dy: 3, stdDeviation: 2, 'flood-opacity': 0.2 }),
-  ]),
-]);
+function defs(p: Palette): string {
+  return el('defs', {}, [
+    marker('arrow', p.arrow),
+    marker('cancel', p.cancel),
+    el('filter', { id: 'shadow', x: '-10%', y: '-10%', width: '130%', height: '130%' }, [
+      el('feDropShadow', { dx: 2, dy: 3, stdDeviation: 2, 'flood-opacity': 0.2 }),
+    ]),
+  ]);
+}
 
-/** Layout into a standalone SVG document string. */
-export function svg({ width, height, stickies, arrows, links, cancels, lanes, gaps }: Layout): string {
+/** Layout into a standalone SVG document string, light unless OPTIONS say otherwise. */
+export function svg(
+  { width, height, stickies, arrows, links, cancels, lanes, gaps }: Layout,
+  { theme = 'light' }: SvgOptions = {},
+): string {
+  const p = PALETTES[theme === 'dark' ? 'dark' : 'light'];
   return el(
     'svg',
     {
       xmlns: 'http://www.w3.org/2000/svg',
+      class: theme === 'auto' ? 'estorm' : undefined,
       width,
       height,
       viewBox: `0 0 ${width} ${height}`,
       'font-family': 'system-ui, -apple-system, sans-serif',
     },
     [
-      DEFS,
-      el('rect', { width: '100%', height: '100%', fill: '#ffffff' }),
-      ...gaps.map(gap),
-      ...lanes.map(lane),
-      ...arrows.map(arrow),
-      ...links.map(link),
-      ...cancels.map(cancel),
+      ...(theme === 'auto' ? [darkStyle(PALETTES.dark)] : []),
+      defs(p),
+      el('rect', { class: 'background', width: '100%', height: '100%', fill: p.background }),
+      ...gaps.map((g) => gap(g, p)),
+      ...lanes.map((l) => lane(l, p)),
+      ...arrows.map((a) => arrow(a, p)),
+      ...links.map((l) => link(l, p)),
+      ...cancels.map((c) => cancel(c, p)),
       ...stickies.map(sticky),
     ],
   );
