@@ -10,6 +10,7 @@
 import type { Board, Step } from './parser.ts';
 import type { Lane, Layout, Path, Point, Rect, Sticky } from './layout.ts';
 import { GAP_Y, LANE_LABEL_H, LANE_PAD, MARGIN, STICKY_H, STICKY_W } from './layout.ts';
+import { maxOf } from './text.ts';
 
 /** Between columns: room for the arrows that turn there. */
 export const COL_GAP = 60;
@@ -198,7 +199,7 @@ export function timeline(board: Board): Layout {
     y += h + SWIMLANE_GAP;
   }
 
-  const width = stickies.length ? Math.max(...stickies.map((s) => s.x + s.w)) + LANE_PAD : 0;
+  const width = stickies.length ? maxOf(stickies.map((s) => s.x + s.w)) + LANE_PAD : 0;
   for (const gap of gaps) gap.w = width;
   for (const b of bands) {
     if (b.key !== null) {

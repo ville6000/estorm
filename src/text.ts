@@ -8,6 +8,13 @@ export const RULE_LINE_HEIGHT = 14;
 /** Room left of a rule's text for its bullet. */
 export const BULLET_W = 10;
 
+/** The largest of XS, or FLOOR if none is larger. Math.max(...xs) overflows the stack on big boards. */
+export function maxOf(xs: Iterable<number>, floor = -Infinity): number {
+  let max = floor;
+  for (const x of xs) if (x > max) max = x;
+  return max;
+}
+
 /** How many characters of FONT_SIZE fit in a sticky of width W. */
 export function maxChars(w: number, fontSize = FONT_SIZE): number {
   return Math.floor((w - 2 * PADDING) / (0.6 * fontSize));

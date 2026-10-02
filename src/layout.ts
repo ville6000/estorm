@@ -7,7 +7,7 @@
  * event if the lane is free there.
  */
 import type { After, Board, Event, Flow, Hotspot, Reaction, Step, When } from './parser.ts';
-import { ruled } from './text.ts';
+import { maxOf, ruled } from './text.ts';
 
 export const STICKY_W = 150;
 export const STICKY_H = 100;
@@ -78,9 +78,11 @@ function colX(col: number): number {
   return col * (STICKY_W + GAP_X);
 }
 
-/** Bottom of the row that sticky S is on: rules can make an aggregate taller than the rest. */
-function rowBottom(stickies: Sticky[], s: Sticky): number {
-  return Math.max(...stickies.filter((o) => o.y === s.y).map((o) => o.y + o.h));
+/** Row top -> row bottom: rules can make an aggregate taller than the rest of its row. */
+type Bottoms = Map<number, number>;
+
+function addBottoms(bottoms: Bottoms, stickies: Sticky[]): void {
+  for (const s of stickies) bottoms.set(s.y, Math.max(bottoms.get(s.y) ?? -Infinity, s.y + s.h));
 }
 
 /** Straight arrow from the right side of A to the left side of B. */
@@ -187,8 +189,15 @@ interface LaneBoard {
   line: number | null;
   y: number;
   stickies: Sticky[];
+  /** Of STICKIES; add them with addStickies to keep it current. */
+  bottoms: Bottoms;
   arrows: Path[];
   pendingLinks: PendingLink[];
+}
+
+function addStickies(lane: LaneBoard, stickies: Sticky[]): void {
+  lane.stickies.push(...stickies);
+  addBottoms(lane.bottoms, stickies);
 }
 
 /**
@@ -223,14 +232,14 @@ function placeRow(lane: LaneBoard, step: Flow | Reaction, x: number, trigger?: T
   }
   const event = placed.at(-1)!;
   const hotspots = step.hotspots.map((h: Hotspot, i) => sticky('hotspot', h.text, h.line, event.x + colX(i + 1), y));
-  lane.stickies.push(...placed, ...hotspots);
+  addStickies(lane, [...placed, ...hotspots]);
   lane.arrows.push(...flowArrows(placed));
-  lane.y += Math.max(...placed.map((s) => s.h)) + GAP_Y;
+  lane.y += maxOf(placed.map((s) => s.h)) + GAP_Y;
 
   if (trigger) {
     const policy = placed[step.informedBy.length]!;
     if (trigger.sticky) {
-      lane.arrows.push(branch(trigger.sticky, rowBottom(lane.stickies, trigger.sticky), policy, start));
+      lane.arrows.push(branch(trigger.sticky, lane.bottoms.get(trigger.sticky.y)!, policy, start));
     } else {
       lane.pendingLinks.push({ event: trigger.text, policy, groupX: start, kind: 'link' });
     }
@@ -254,7 +263,7 @@ function placeEvents(lane: LaneBoard, events: Event[]): void {
   for (const e of events) {
     last = sticky('event', e.name, e.line, x, y);
     const hotspots = e.hotspots.map((h, i) => sticky('hotspot', h.text, h.line, x + colX(i + 1), y));
-    lane.stickies.push(last, ...hotspots);
+    addStickies(lane, [last, ...hotspots]);
     x += colX(hotspots.length + 1);
   }
   lane.y += STICKY_H + GAP_Y;
@@ -293,7 +302,10 @@ function placeWhen(lane: LaneBoard, { event, reactions }: When, positions: Map<s
 }
 
 function placeHotspotRow(lane: LaneBoard, hotspots: Hotspot[]): void {
-  lane.stickies.push(...hotspots.map((h, i) => sticky('hotspot', h.text, h.line, colX(i), lane.y)));
+  addStickies(
+    lane,
+    hotspots.map((h, i) => sticky('hotspot', h.text, h.line, colX(i), lane.y)),
+  );
   lane.y += STICKY_H + FLOW_GAP;
 }
 
@@ -308,7 +320,7 @@ function placeAll(board: Board, positions: Map<string, Position>): LaneBoard[] {
   const lane = (key: LaneKey, name: string | null = null, line: number | null = null) => {
     let l = lanes.get(key);
     if (!l) {
-      l = { key, name, line, y: top, stickies: [], arrows: [], pendingLinks: [] };
+      l = { key, name, line, y: top, stickies: [], bottoms: new Map(), arrows: [], pendingLinks: [] };
       lanes.set(key, l);
     }
     return l;
@@ -362,7 +374,10 @@ function placeAll(board: Board, positions: Map<string, Position>): LaneBoard[] {
 }
 
 function laneWidth({ stickies }: LaneBoard): number {
-  return Math.max(STICKY_W, ...stickies.map((s) => s.x + s.w));
+  return maxOf(
+    stickies.map((s) => s.x + s.w),
+    STICKY_W,
+  );
 }
 
 function shift(dx: number, lane: LaneBoard): LaneBoard {
@@ -376,9 +391,9 @@ function shift(dx: number, lane: LaneBoard): LaneBoard {
 }
 
 /** Elbow arrow from the first event sticky named EVENT into POLICY. Cancel links run beside 'when' links. */
-function link(stickies: Sticky[], { event, policy, groupX, kind }: PendingLink): Path {
-  const e = stickies.find((s) => s.kind === 'event' && s.text === event)!;
-  return branch(e, rowBottom(stickies, e), policy, groupX, kind === 'cancel' ? -6 : 6);
+function link(events: Map<string, Sticky>, bottoms: Bottoms, { event, policy, groupX, kind }: PendingLink): Path {
+  const e = events.get(event)!;
+  return branch(e, bottoms.get(e.y)!, policy, groupX, kind === 'cancel' ? -6 : 6);
 }
 
 const MAX_PASSES = 10;
@@ -404,12 +419,16 @@ export function layout(board: Board): Layout {
   const stickies = placed.flatMap((l) => l.stickies);
   const arrows = placed.flatMap((l) => l.arrows);
   const pending = placed.flatMap((l) => l.pendingLinks);
-  const links = pending.filter((l) => l.kind === 'link').map((l) => link(stickies, l));
-  const cancels = pending.filter((l) => l.kind === 'cancel').map((l) => link(stickies, l));
+  const events = new Map<string, Sticky>();
+  for (const s of stickies) if (s.kind === 'event' && !events.has(s.text)) events.set(s.text, s);
+  const bottoms: Bottoms = new Map();
+  addBottoms(bottoms, stickies);
+  const links = pending.filter((l) => l.kind === 'link').map((l) => link(events, bottoms, l));
+  const cancels = pending.filter((l) => l.kind === 'cancel').map((l) => link(events, bottoms, l));
   const width = bandWs.length ? bandXs.at(-1)! - LANE_GAP : 0;
   const height =
     MARGIN +
-    Math.max(0, ...stickies.map((s) => s.y + s.h), ...[...arrows, ...links, ...cancels].flat().map(([, y]) => y));
+    maxOf([...stickies.map((s) => s.y + s.h), ...[...arrows, ...links, ...cancels].flat().map(([, y]) => y)], 0);
 
   return {
     width,
