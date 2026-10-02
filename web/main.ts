@@ -17,7 +17,18 @@ import {
 } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, insertNewlineKeepIndent } from '@codemirror/commands';
 import { vim, Vim } from '@replit/codemirror-vim';
-import { layout, lint, parse, ParseError, summarize, svg, type Warning } from '../src/index.ts';
+import {
+  layout,
+  lint,
+  parse,
+  ParseError,
+  summarize,
+  svg,
+  timeline,
+  type Board,
+  type Layout,
+  type Warning,
+} from '../src/index.ts';
 import { tokenize } from '../src/highlight.ts';
 
 // File System Access API: Chromium only, so feature-detected.
@@ -37,6 +48,7 @@ declare global {
 const PICKER_TYPES = [{ description: 'estorm board', accept: { 'text/plain': ['.estorm'] } }];
 const DRAFT_KEY = 'estorm:draft';
 const VIM_KEY = 'estorm:vim';
+const TIMELINE_KEY = 'estorm:timeline';
 const ZOOMS = [0.25, 0.33, 0.5, 0.67, 0.8, 1, 1.25, 1.5, 2];
 
 const examples = Object.fromEntries(
@@ -54,6 +66,7 @@ const examplePicker = $<HTMLSelectElement>('examples');
 const cheatsheet = $<HTMLElement>('cheatsheet');
 const helpButton = $<HTMLButtonElement>('help');
 const vimButton = $<HTMLButtonElement>('vim');
+const timelineButton = $<HTMLButtonElement>('timeline');
 const summaryPanel = $<HTMLElement>('summary');
 const summaryBody = $<HTMLDivElement>('summary-body');
 const warningList = $<HTMLDivElement>('warnings');
@@ -67,6 +80,7 @@ const state = {
   zoom: 1,
   size: { width: 0, height: 0 },
   vim: false,
+  timeline: false,
   summary: '',
 };
 
@@ -109,11 +123,16 @@ function warningsHtml(warnings: Warning[]): string {
   return `<h3>Warnings (${warnings.length})</h3><ul>${items}</ul>`;
 }
 
+/** The board's layout in the current view. */
+function boardLayout(ast: Board): Layout {
+  return state.timeline ? timeline(ast) : layout(ast);
+}
+
 function renderBoard(): void {
   const text = sourceText();
   try {
     const ast = parse(text);
-    const l = layout(ast);
+    const l = boardLayout(ast);
     board.innerHTML = svg(l);
     state.summary = summarize(ast);
     summaryBody.innerHTML = summaryHtml(state.summary);
@@ -384,7 +403,7 @@ async function save(): Promise<void> {
 /** The board as SVG, or null after telling the user to fix the parse error first. */
 function boardSvg(): string | null {
   try {
-    return svg(layout(parse(sourceText())));
+    return svg(boardLayout(parse(sourceText())));
   } catch (e) {
     if (!(e instanceof ParseError)) throw e;
     alert(`Fix the error first: line ${e.line}: ${e.message}`);
@@ -466,6 +485,13 @@ $('zoom-reset').addEventListener('click', () => {
   applyZoom();
 });
 $('zoom-fit').addEventListener('click', zoomToFit);
+timelineButton.addEventListener('click', () => {
+  state.timeline = !state.timeline;
+  timelineButton.setAttribute('aria-pressed', String(state.timeline));
+  storage(() => localStorage.setItem(TIMELINE_KEY, state.timeline ? '1' : ''));
+  renderBoard();
+  zoomToFit();
+});
 vimButton.addEventListener('click', () => {
   setVim(!state.vim);
   view.focus();
@@ -510,6 +536,8 @@ examplePicker.addEventListener('change', () => {
 
 state.vim = storage(() => localStorage.getItem(VIM_KEY) === '1') ?? false;
 vimButton.setAttribute('aria-pressed', String(state.vim));
+state.timeline = storage(() => localStorage.getItem(TIMELINE_KEY) === '1') ?? false;
+timelineButton.setAttribute('aria-pressed', String(state.timeline));
 
 const draft = storage(() => JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null')) as
   { name: string; text: string } | null | undefined;
