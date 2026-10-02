@@ -53,8 +53,8 @@ Download `estorm.html` from the
 [latest release](https://github.com/ville6000/estorm/releases/latest) and
 open it. It is a single self-contained file that works offline: edit on the
 left, see the board on the right, click a sticky to jump to its line, open
-and save `.estorm` files, export SVG, and open a summary of lint warnings,
-actors, aggregates, context dependencies, gaps and hotspots.
+and save `.estorm` files, export SVG or PNG, and open a summary of lint
+warnings, actors, aggregates, context dependencies, gaps and hotspots.
 
 It is also hosted at <https://ville6000.github.io/estorm/>, updated on
 each release.
