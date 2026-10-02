@@ -68,3 +68,19 @@ it feel immediate.
 Any editor with an LSP client can run the server: start
 `estorm lsp` for files ending in `.estorm`, talking over stdio. The
 colours need a client that supports semantic tokens.
+
+## Embedding the server
+
+An editor extension can bundle the server instead of running the `estorm`
+command. `@villev/estorm/lsp` exports it:
+
+```ts
+import { serveStdio } from '@villev/estorm/lsp';
+
+serveStdio(); // the same server as `estorm lsp`, over stdio
+```
+
+Unlike `estorm lsp`, it ignores command-line arguments, so LSP clients that
+add `--stdio` or `--clientProcessId` can start it directly. `createServer`
+is the protocol without the transport, and `TOKEN_TYPES` is the semantic
+token legend.

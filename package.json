@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./lsp": {
+      "types": "./dist/lsp.d.ts",
+      "default": "./dist/lsp.js"
     }
   },
   "publishConfig": {
