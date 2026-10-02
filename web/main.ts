@@ -17,7 +17,7 @@ import {
 } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, insertNewlineKeepIndent } from '@codemirror/commands';
 import { vim, Vim } from '@replit/codemirror-vim';
-import { layout, parse, ParseError, svg } from '../src/index.ts';
+import { layout, parse, ParseError, summarize, svg } from '../src/index.ts';
 import { tokenize } from '../src/highlight.ts';
 
 // File System Access API: Chromium only, so feature-detected.
@@ -54,6 +54,9 @@ const examplePicker = $<HTMLSelectElement>('examples');
 const cheatsheet = $<HTMLElement>('cheatsheet');
 const helpButton = $<HTMLButtonElement>('help');
 const vimButton = $<HTMLButtonElement>('vim');
+const summaryPanel = $<HTMLElement>('summary');
+const summaryBody = $<HTMLDivElement>('summary-body');
+const summaryButton = $<HTMLButtonElement>('summary-toggle');
 
 const state = {
   name: 'untitled.estorm',
@@ -63,6 +66,7 @@ const state = {
   zoom: 1,
   size: { width: 0, height: 0 },
   vim: false,
+  summary: '',
 };
 
 function storage<T>(f: () => T): T | undefined {
@@ -75,11 +79,35 @@ function storage<T>(f: () => T): T | undefined {
 
 // --- rendering ---------------------------------------------------------------
 
+const escape = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/** The summary's Markdown (headings, bullets, paragraphs) as HTML. */
+function summaryHtml(markdown: string): string {
+  return markdown
+    .trim()
+    .split(/\n\n+/)
+    .map((block) => {
+      if (block.startsWith('## ')) return `<h3>${escape(block.slice(3))}</h3>`;
+      if (block.startsWith('- ')) {
+        return `<ul>${block
+          .split('\n')
+          .map((l) => `<li>${escape(l.slice(2))}</li>`)
+          .join('')}</ul>`;
+      }
+      return `<p>${escape(block)}</p>`;
+    })
+    .join('');
+}
+
 function renderBoard(): void {
   const text = sourceText();
   try {
-    const l = layout(parse(text));
+    const ast = parse(text);
+    const l = layout(ast);
     board.innerHTML = svg(l);
+    state.summary = summarize(ast);
+    summaryBody.innerHTML = summaryHtml(state.summary);
+    summaryPanel.classList.remove('stale');
     state.size = { width: l.width, height: l.height };
     state.errorLine = null;
     errorBar.hidden = true;
@@ -91,6 +119,7 @@ function renderBoard(): void {
     errorBar.textContent = `line ${e.line}: ${e.message}`;
     errorBar.hidden = false;
     board.classList.add('stale');
+    summaryPanel.classList.add('stale');
   }
   view.dispatch({ effects: setErrorLine.of(state.errorLine) });
   fileName.textContent = state.name;
@@ -387,9 +416,30 @@ vimButton.addEventListener('click', () => {
   view.focus();
 });
 
-helpButton.addEventListener('click', () => {
-  cheatsheet.hidden = !cheatsheet.hidden;
-  helpButton.setAttribute('aria-expanded', String(!cheatsheet.hidden));
+/** Shows PANEL, or hides it if shown; the panels share a corner, so one at a time. */
+function togglePanel(panel: HTMLElement): void {
+  const show = panel.hidden;
+  for (const [p, button] of [
+    [cheatsheet, helpButton],
+    [summaryPanel, summaryButton],
+  ] as const) {
+    p.hidden = !(show && p === panel);
+    button.setAttribute('aria-expanded', String(!p.hidden));
+  }
+}
+
+helpButton.addEventListener('click', () => togglePanel(cheatsheet));
+summaryButton.addEventListener('click', () => togglePanel(summaryPanel));
+
+$('copy-summary').addEventListener('click', async (e) => {
+  const button = e.currentTarget as HTMLButtonElement;
+  try {
+    await navigator.clipboard.writeText(state.summary);
+    button.textContent = 'Copied';
+  } catch {
+    button.textContent = 'Copy failed';
+  }
+  setTimeout(() => (button.textContent = 'Copy Markdown'), 1500);
 });
 
 for (const name of Object.keys(examples).sort()) {

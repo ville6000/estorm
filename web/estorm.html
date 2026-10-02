@@ -20,6 +20,15 @@
           <option value="">Examples…</option>
         </select>
         <button id="vim" type="button" aria-pressed="false" title="Toggle vim keybindings (:w saves)">Vim</button>
+        <button
+          id="summary-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="summary"
+          title="Actors, aggregates, context dependencies, gaps and hotspots"
+        >
+          Summary
+        </button>
         <button id="help" type="button" aria-expanded="false" aria-controls="cheatsheet">Syntax</button>
       </div>
       <div class="zoom" role="group" aria-label="Zoom">
@@ -40,7 +49,15 @@
         <div id="board" class="board"></div>
       </section>
 
-      <aside id="cheatsheet" class="cheatsheet" hidden>
+      <aside id="summary" class="panel summary" hidden>
+        <div class="panel-header">
+          <h2>Summary</h2>
+          <button id="copy-summary" type="button" title="Copy the summary as Markdown">Copy Markdown</button>
+        </div>
+        <div id="summary-body"></div>
+      </aside>
+
+      <aside id="cheatsheet" class="panel cheatsheet" hidden>
         <h2>Syntax</h2>
         <pre>
 # comment

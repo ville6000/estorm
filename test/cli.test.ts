@@ -37,6 +37,20 @@ describe('cli', () => {
     expect(stderr.trim()).toBe(`${file}:2: chain must end with an event`);
   });
 
+  it('summarises to stdout', () => {
+    const { status, stdout } = run('summary', fixture('A: Do -> Done'));
+    expect(status).toBe(0);
+    expect(stdout).toContain('## Actors\n\nCommands each actor or schedule issues.\n\n- A: Do\n');
+  });
+
+  it('heads each summary with its file when there are several', () => {
+    const [a, b] = [fixture('Started'), fixture('Stopped')];
+    const { status, stdout } = run('summary', a, b);
+    expect(status).toBe(0);
+    expect(stdout).toContain(`# ${a}\n\n## Events`);
+    expect(stdout).toContain(`\n\n# ${b}\n\n## Events`);
+  });
+
   it('reports missing files', () => {
     const { status, stderr } = run('check', 'nope.estorm');
     expect(status).toBe(1);
