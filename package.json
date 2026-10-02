@@ -1,6 +1,6 @@
 {
   "name": "@villev/estorm",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "A plain-text notation for Event Storming boards, rendered to SVG",
   "keywords": [
     "event-storming",
