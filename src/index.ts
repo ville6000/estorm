@@ -4,6 +4,7 @@
  *   render(text)               estorm text -> SVG string; render(text, { theme: 'dark' | 'auto' })
  *   renderTimeline(text)       the timeline view: events only, sections as swimlanes
  *   parse(text) -> layout(...) -> svg(...)   the same, step by step
+ *   parseAll(text)             every parse error at once, and the board without the broken lines
  *   summarize(parse(text))     a Markdown overview of the board
  *   lint(parse(text))          modelling warnings, such as events not in the past tense
  */
@@ -13,7 +14,7 @@ import { timeline } from './timeline.ts';
 import { svg } from './svg.ts';
 import type { SvgOptions } from './svg.ts';
 
-export { parse, ParseError } from './parser.ts';
+export { parse, parseAll, ParseError } from './parser.ts';
 export type * from './parser.ts';
 export { layout } from './layout.ts';
 export type { Kind, Lane, Layout, Path, Point, Rect, Sticky } from './layout.ts';

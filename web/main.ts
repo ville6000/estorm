@@ -21,6 +21,7 @@ import {
   layout,
   lint,
   parse,
+  parseAll,
   ParseError,
   summarize,
   svg,
@@ -62,7 +63,7 @@ const examples = Object.fromEntries(
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const board = $<HTMLDivElement>('board');
-const errorBar = $<HTMLButtonElement>('error');
+const errorList = $<HTMLDivElement>('errors');
 const fileName = $<HTMLSpanElement>('file-name');
 const fileInput = $<HTMLInputElement>('file-input');
 const examplePicker = $<HTMLSelectElement>('examples');
@@ -79,7 +80,6 @@ const state = {
   name: 'untitled.estorm',
   handle: null as FileHandle | null,
   saved: '',
-  errorLine: null as number | null,
   zoom: 1,
   size: { width: 0, height: 0 },
   vim: false,
@@ -117,6 +117,13 @@ function summaryHtml(markdown: string): string {
     .join('');
 }
 
+/** Parse errors as buttons that jump to their lines. */
+function errorsHtml(errors: ParseError[]): string {
+  return errors
+    .map((e) => `<button type="button" data-line="${e.line}">line ${e.line}: ${escape(e.message)}</button>`)
+    .join('');
+}
+
 /** Lint warnings as a heading and a list of buttons that jump to their lines. */
 function warningsHtml(warnings: Warning[]): string {
   if (!warnings.length) return '';
@@ -133,8 +140,13 @@ function boardLayout(ast: Board): Layout {
 
 function renderBoard(): void {
   const text = sourceText();
-  try {
-    const ast = parse(text);
+  const { board: ast, errors } = parseAll(text);
+  errorList.innerHTML = errorsHtml(errors);
+  errorList.hidden = !errors.length;
+  if (errors.length) {
+    board.classList.add('stale');
+    summaryPanel.classList.add('stale');
+  } else {
     const l = boardLayout(ast);
     board.innerHTML = svg(l, { theme: 'auto' });
     state.summary = summarize(ast);
@@ -144,19 +156,10 @@ function renderBoard(): void {
     summaryButton.textContent = warnings.length ? `Summary (${warnings.length})` : 'Summary';
     summaryPanel.classList.remove('stale');
     state.size = { width: l.width, height: l.height };
-    state.errorLine = null;
-    errorBar.hidden = true;
     board.classList.remove('stale');
     applyZoom();
-  } catch (e) {
-    if (!(e instanceof ParseError)) throw e;
-    state.errorLine = e.line;
-    errorBar.textContent = `line ${e.line}: ${e.message}`;
-    errorBar.hidden = false;
-    board.classList.add('stale');
-    summaryPanel.classList.add('stale');
   }
-  view.dispatch({ effects: setErrorLine.of(state.errorLine) });
+  view.dispatch({ effects: setErrorLines.of(errors.map((e) => e.line)) });
   fileName.textContent = state.name;
   fileName.classList.toggle('dirty', text !== state.saved);
   storage(() => localStorage.setItem(DRAFT_KEY, JSON.stringify({ name: state.name, text })));
@@ -194,8 +197,8 @@ function zoomToFit(): void {
 
 // --- editing ---------------------------------------------------------------
 
-/** Marks the line number of the line with a parse error. */
-const setErrorLine = StateEffect.define<number | null>();
+/** Marks the line numbers of the lines with parse errors. */
+const setErrorLines = StateEffect.define<number[]>();
 const badLine = new (class extends GutterMarker {
   override elementClass = 'bad';
 })();
@@ -203,10 +206,12 @@ const errorLineField = StateField.define<RangeSet<GutterMarker>>({
   create: () => RangeSet.empty,
   update(markers, tr) {
     for (const e of tr.effects) {
-      if (!e.is(setErrorLine)) continue;
-      const line = e.value;
-      if (line === null || line > tr.state.doc.lines) return RangeSet.empty;
-      return RangeSet.of(badLine.range(tr.state.doc.line(line).from));
+      if (!e.is(setErrorLines)) continue;
+      const lines = [...new Set(e.value)].filter((n) => n <= tr.state.doc.lines);
+      return RangeSet.of(
+        lines.map((n) => badLine.range(tr.state.doc.line(n).from)),
+        true,
+      );
     }
     return markers.map(tr.changes);
   },
@@ -327,8 +332,9 @@ warningList.addEventListener('click', (e) => {
   if (button) goToLine(Number(button.getAttribute('data-line')));
 });
 
-errorBar.addEventListener('click', () => {
-  if (state.errorLine) goToLine(state.errorLine);
+errorList.addEventListener('click', (e) => {
+  const button = (e.target as Element).closest('[data-line]');
+  if (button) goToLine(Number(button.getAttribute('data-line')));
 });
 
 // --- files -------------------------------------------------------------------

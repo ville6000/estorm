@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { parseArgs } from 'node:util';
-import { lint, parse, ParseError, render, renderTimeline, summarize } from './index.ts';
+import { lint, parse, parseAll, ParseError, render, renderTimeline, summarize } from './index.ts';
 import type { Theme } from './index.ts';
 import { serveStdio } from './lsp.ts';
 
@@ -39,7 +39,7 @@ const READ_ERRORS: Record<string, string> = {
   EACCES: 'permission denied',
 };
 
-/** FILE through CONVERT (SVG by default), or its first error as "file:line: message". */
+/** FILE through CONVERT (SVG by default), or its errors as "file:line: message" lines. */
 function compile(file: string, convert: (text: string) => string = render): Result {
   let text: string;
   try {
@@ -51,7 +51,13 @@ function compile(file: string, convert: (text: string) => string = render): Resu
   try {
     return { out: convert(text) };
   } catch (e) {
-    if (e instanceof ParseError) return { error: `${file}:${e.line}: ${e.message}` };
+    if (e instanceof ParseError) {
+      return {
+        error: parseAll(text)
+          .errors.map((err) => `${file}:${err.line}: ${err.message}`)
+          .join('\n'),
+      };
+    }
     throw e;
   }
 }
@@ -99,11 +105,14 @@ function lintFiles(files: string[]): number {
   if (files.length === 0) throw new UsageError('lint needs at least one file');
   let failed = 0;
   for (const file of files) {
-    const result = compile(file, (text) =>
-      lint(parse(text))
+    // Errors and warnings by line, warnings only for what parsed.
+    const result = compile(file, (text) => {
+      const { board, errors } = parseAll(text);
+      return [...errors, ...lint(board)]
+        .sort((a, b) => a.line - b.line)
         .map((w) => `${file}:${w.line}: ${w.message}\n`)
-        .join(''),
-    );
+        .join('');
+    });
     const out = 'error' in result ? `${result.error}\n` : result.out;
     if (out) failed++;
     process.stderr.write(out);
