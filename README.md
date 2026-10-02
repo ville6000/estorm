@@ -84,8 +84,9 @@ used in more than one bounded context; see
 ### In your editor
 
 `estorm lsp` is a language server for any editor that speaks LSP: sticky
-colours, parse errors and lint warnings as you type, and highlights for the
-event under the cursor. Setup for Neovim is in [EDITORS.md](EDITORS.md).
+colours, parse errors and lint warnings as you type, highlights for the
+event under the cursor, and completion of keywords and of the events,
+aggregates, externals and actors already on the board. Setup for Neovim is in [EDITORS.md](EDITORS.md).
 
 ### In Docker or CI
 
