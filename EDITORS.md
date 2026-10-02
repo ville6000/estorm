@@ -11,13 +11,20 @@ Token types are named after the stickies: `actor`, `command`, `aggregate`,
 the standard `comment`, `keyword` and `operator`. Most themes colour only
 the standard ones, so give the others colours yourself.
 
+The server comes with the command line. Install it once, and it then
+works offline:
+
+```sh
+npm install -g @villev/estorm
+```
+
 ## Neovim
 
 Neovim 0.11 or later:
 
 ```lua
 vim.filetype.add({ extension = { estorm = 'estorm' } })
-vim.lsp.config('estorm', { cmd = { 'npx', '@villev/estorm', 'lsp' }, filetypes = { 'estorm' } })
+vim.lsp.config('estorm', { cmd = { 'estorm', 'lsp' }, filetypes = { 'estorm' } })
 vim.lsp.enable('estorm')
 
 -- Colours like the browser editor's.
@@ -59,6 +66,5 @@ it feel immediate.
 ## Other editors
 
 Any editor with an LSP client can run the server: start
-`npx @villev/estorm lsp` (or `estorm lsp` when installed) for files ending
-in `.estorm`, talking over stdio. The colours need a client that supports
-semantic tokens.
+`estorm lsp` for files ending in `.estorm`, talking over stdio. The
+colours need a client that supports semantic tokens.
