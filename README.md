@@ -21,15 +21,27 @@ when OrderPlaced
 
 ![A web shop checkout board rendered by estorm](examples/checkout.svg)
 
-Because boards are text, they live in your repository next to the code.
-Changes go through review like any other change, show up as readable diffs,
-and never go stale on a whiteboard photo.
+## What it's for
+
+estorm is not a replacement for the workshop. A live session with a dozen
+people at a wall works best with paper stickies or a shared whiteboard. Run
+the workshop there, then capture the result here.
+
+Text fits what comes after the workshop:
+
+- **Keeping the board.** Boards live in your repository next to the code.
+  Changes go through review like any other change, show up as readable
+  diffs, and never go stale on a whiteboard photo.
+- **Refining it.** Start with the events as they came up, then add actors,
+  commands, aggregates and policies as the model firms up.
+- **Modelling alone.** Sketch a domain before a workshop, to find the
+  questions worth asking the room.
 
 ## Which one do you need?
 
 | You want to…                                   | Use                               | Install                       |
 | ---------------------------------------------- | --------------------------------- | ----------------------------- |
-| Draw a board, alone or in a workshop           | [Browser editor](#browser-editor) | Nothing: download one file    |
+| Capture a workshop, or model alone             | [Browser editor](#browser-editor) | Nothing: download one file    |
 | Render, check or lint boards from the terminal | [Command line](#command-line)     | `npm install -g`, Node.js 22+ |
 | Write boards in Neovim or another LSP editor   | [Editor support](#editor-support) | The command line              |
 | Render boards in CI                            | [Docker and CI](#docker-and-ci)   | Docker                        |
