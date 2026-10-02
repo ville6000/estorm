@@ -121,15 +121,27 @@ select:focus-visible {
   content: ' •';
 }
 
-.actions,
+.group,
 .zoom {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
 }
 
-.zoom {
+.board-group {
+  gap: 6px 12px;
   margin-left: auto;
+}
+
+.repo {
+  display: flex;
+  color: var(--muted);
+}
+
+.repo:hover,
+.repo:focus-visible {
+  color: var(--text);
 }
 
 .workspace {
@@ -375,7 +387,7 @@ select:focus-visible {
     border-bottom: 1px solid var(--border);
   }
 
-  .zoom {
+  .board-group {
     margin-left: 0;
   }
 }
