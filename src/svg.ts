@@ -1,6 +1,6 @@
 /** Renders a layout (see layout.ts) as a standalone SVG document. */
 import { LANE_LABEL_H, LANE_PAD } from './layout.ts';
-import type { Kind, Lane, Layout, Path, Rect, Sticky } from './layout.ts';
+import type { Kind, Lane, Layout, Path, Sticky } from './layout.ts';
 import {
   BULLET_W,
   FONT_SIZE,
@@ -68,7 +68,6 @@ const LEGEND_SPACE = 32;
 /** Colours of everything but the stickies, which keep theirs (and dark text) in both themes. */
 interface Palette {
   background: string;
-  gap: string;
   lane: string;
   arrow: string;
   link: string;
@@ -78,7 +77,6 @@ interface Palette {
 const PALETTES: Record<'light' | 'dark', Palette> = {
   light: {
     background: '#ffffff',
-    gap: '#e9ecef',
     lane: '#495057',
     arrow: '#868e96',
     link: '#495057',
@@ -86,7 +84,6 @@ const PALETTES: Record<'light' | 'dark', Palette> = {
   },
   dark: {
     background: '#1a1b1e',
-    gap: '#2c2e33',
     lane: '#c1c2c5',
     arrow: '#909296',
     link: '#a6a7ab',
@@ -103,7 +100,6 @@ function darkStyle(p: Palette): string {
     {},
     '@media (prefers-color-scheme: dark) {' +
       ` .estorm .background { fill: ${p.background} }` +
-      ` .estorm .gap { fill: ${p.gap} }` +
       ` .estorm .lane text { fill: ${p.lane} }` +
       ` .estorm .legend text { fill: ${p.lane} }` +
       ` .estorm .arrow { stroke: ${p.arrow} }` +
@@ -243,10 +239,6 @@ function cancel(points: Path, p: Palette): string {
   });
 }
 
-function gap({ x, y, w, h }: Rect, p: Palette): string {
-  return el('rect', { class: 'gap', x, y, width: w, height: h, fill: p.gap });
-}
-
 function lane({ name, line, x, y }: Lane, p: Palette): string {
   return el('g', { class: 'lane', 'data-line': line }, [
     el(
@@ -360,7 +352,7 @@ function legend(layout: Layout, p: Palette): { body: string; width: number; heig
 
 /** Layout into a standalone SVG document string, light unless OPTIONS say otherwise. */
 export function svg(layout: Layout, { theme = 'light', legend: withLegend = true }: SvgOptions = {}): string {
-  const { stickies, arrows, links, cancels, lanes, gaps } = layout;
+  const { stickies, arrows, links, cancels, lanes, panels } = layout;
   const p = PALETTES[theme === 'dark' ? 'dark' : 'light'];
   const key = withLegend ? legend(layout, p) : { body: '', width: 0, height: 0 };
   const width = Math.max(layout.width, key.width);
@@ -381,8 +373,9 @@ export function svg(layout: Layout, { theme = 'light', legend: withLegend = true
       key.body,
       // The board moves down to make room for the legend.
       el('g', { transform: key.height ? `translate(0 ${key.height})` : undefined }, [
-        el('rect', { class: 'background', width, height: layout.height, fill: p.background }),
-        ...gaps.map((g) => gap(g, p)),
+        ...panels.map(({ x, y, w, h }) =>
+          el('rect', { class: 'background', x, y, width: w, height: h, fill: p.background }),
+        ),
         ...lanes.map((l) => lane(l, p)),
         ...arrows.map((a) => arrow(a, p)),
         ...links.map((l) => link(l, p)),

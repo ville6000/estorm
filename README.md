@@ -64,7 +64,7 @@ dependencies.
 | `  after 30 days unless Event`           | delayed policy, cancelled by an event                   |
 | `every night at 02:00: Command -> Event` | flow driven by a schedule                               |
 | `when Event`                             | policy reacting to an event by name                     |
-| `== Context ==`                          | bounded context, drawn as a lane                        |
+| `== Context ==`                          | bounded context, drawn as a swimlane                    |
 | `! Question?`                            | hotspot                                                 |
 | `* Rule`                                 | business rule, listed in the aggregate above            |
 | `# comment`                              | ignored                                                 |

@@ -29,7 +29,7 @@ Customer: Submit ticket -> (Ticket) -> TicketSubmitted
 | last chain item, or a name on its own line | event               | orange               |
 | `! text`                                   | hotspot             | red                  |
 | `* text`                                   | rule, in aggregate  | (aggregate's yellow) |
-| `== Name ==`                               | section (lane)      | white lane, grey gap |
+| `== Name ==`                               | section (lane)      | own panel            |
 
 ## Statements
 
@@ -82,8 +82,9 @@ every night at 02:00: Command -> Event
 one from another section (bounded context). Its `then` reactions are indented
 one level. The event may be produced anywhere in the file, before or after.
 The policies are linked to that event by a dashed arrow. In the event's own
-section they start in its column; in another section, at the section's
-first column, level with the event when the lane is free there.
+section they start under the event; in another section, right of it, on the
+next free row of that section. What comes after a `when` in its section
+starts no further left, if its event is earlier in the file.
 
 ```
 when Event
@@ -105,11 +106,11 @@ OrderShipped
 ```
 
 **Section** — starts a bounded context. Everything below, up to the next
-section, belongs to it, and is drawn in its own vertical lane. Lanes sit
-side by side, left to right, in order of first appearance; rows stack
-inside each lane. Content before the first section goes in an unnamed lane
-on the left. A section may appear more than once; later parts continue its
-lane.
+section, belongs to it, and is drawn in its own horizontal swimlane. All
+lanes share one time axis, left to right; they stack top to bottom in order
+of first appearance, and rows stack inside each lane. Content before the
+first section goes in an unnamed lane on top. A section may appear more than
+once; later parts continue its lane.
 
 ```
 == Name ==

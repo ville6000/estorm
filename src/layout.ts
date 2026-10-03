@@ -1,10 +1,12 @@
 /**
- * Places AST stickies on the board. Time runs left to right; every flow and
- * reaction gets its own row, consecutive events on their own share one, and a reaction starts under the event that
- * triggered it. Sections are vertical lanes, side by side in order of first
- * appearance. A 'when' reaction is linked to the event it names by a dashed
- * arrow; in another lane it starts at the lane's left edge, level with that
- * event if the lane is free there.
+ * Places AST stickies on the board. Time runs left to right on one axis
+ * shared by all sections; every flow and reaction gets its own row,
+ * consecutive events on their own share one, and a reaction starts under the
+ * event that triggered it. Sections are horizontal swimlanes, top to bottom
+ * in order of first appearance, as in the timeline view. A 'when' reaction is
+ * linked to the event it names by a dashed arrow; in another lane it starts
+ * right of that event, on the next free row of its own lane. Nothing at the
+ * top level of a lane starts left of what is above it.
  */
 import type { After, Board, Event, Flow, Hotspot, Reaction, Step, When } from './parser.ts';
 import { maxOf, ruled } from './text.ts';
@@ -17,7 +19,8 @@ export const FLOW_GAP = 40;
 export const MARGIN = 20;
 export const LANE_LABEL_H = 36;
 export const LANE_PAD = 30;
-export const LANE_GAP = 80;
+/** Between swimlanes. */
+export const SWIMLANE_GAP = 20;
 
 export type Kind =
   'read-model' | 'actor' | 'schedule' | 'policy' | 'command' | 'aggregate' | 'external' | 'event' | 'hotspot';
@@ -66,8 +69,8 @@ export interface Layout {
   cancels: Path[];
   /** Named sections, as full-height bands. */
   lanes: Lane[];
-  /** The space between lanes. */
-  gaps: Rect[];
+  /** The areas drawn on the board's background: one per lane, with nothing between them. */
+  panels: Rect[];
 }
 
 function sticky(kind: Kind, text: string, line: number, x: number, y: number): Sticky {
@@ -100,13 +103,15 @@ function arrow(a: Sticky, b: Sticky): Path {
  * row is entered straight from above; otherwise the arrow runs down a rail
  * left of the row, then over the row into the top of the policy. Sibling
  * reactions share the rail; OFFSET shifts the route so links run beside it.
+ * CLEAR, if given, moves the rail off any sticky between its ends.
  */
-function branch(e: Sticky, bottom: number, policy: Sticky, groupX: number, offset = 0): Path {
+function branch(e: Sticky, bottom: number, policy: Sticky, groupX: number, offset = 0, clear?: Clear): Path {
   const midX = e.x + 0.5 * STICKY_W + 2 * offset;
   const below = bottom + 0.5 * GAP_Y + offset;
   const above = policy.y - 0.5 * GAP_Y + offset;
   const px = policy.x + 0.5 * STICKY_W + 2 * offset;
-  const rail = groupX - 0.5 * GAP_X - offset;
+  const preferred = groupX - 0.5 * GAP_X - offset;
+  const rail = clear ? clear(preferred, Math.min(below, above), Math.max(below, above)) : preferred;
   return [
     [midX, e.y + STICKY_H],
     [midX, below],
@@ -193,6 +198,8 @@ interface LaneBoard {
   bottoms: Bottoms;
   arrows: Path[];
   pendingLinks: PendingLink[];
+  /** Swimlanes only: where the last top-level item starts; the next starts no further left. */
+  minX: number;
 }
 
 function addStickies(lane: LaneBoard, stickies: Sticky[]): void {
@@ -258,7 +265,7 @@ function placeRow(lane: LaneBoard, step: Flow | Reaction, x: number, trigger?: T
  */
 function placeEvents(lane: LaneBoard, events: Event[]): void {
   const { y } = lane;
-  let x = 0;
+  let x = lane.minX;
   let last: Sticky | undefined;
   for (const e of events) {
     last = sticky('event', e.name, e.line, x, y);
@@ -275,7 +282,8 @@ function placeEvents(lane: LaneBoard, events: Event[]): void {
 interface Position {
   lane: LaneKey;
   x: number;
-  y: number;
+  /** Source line of the event. */
+  line: number;
 }
 
 /** Event name -> position of its first sticky, from LANES of a pass. */
@@ -283,7 +291,7 @@ function eventPositions(lanes: LaneBoard[]): Map<string, Position> {
   const m = new Map<string, Position>();
   for (const lane of lanes) {
     for (const s of lane.stickies) {
-      if (s.kind === 'event' && !m.has(s.text)) m.set(s.text, { lane: lane.key, x: s.x, y: s.y });
+      if (s.kind === 'event' && !m.has(s.text)) m.set(s.text, { lane: lane.key, x: s.x, line: s.line });
     }
   }
   return m;
@@ -291,20 +299,25 @@ function eventPositions(lanes: LaneBoard[]): Map<string, Position> {
 
 /**
  * Places the reactions of a 'when'. In the lane of its event they start
- * under the event; in another lane at its left edge, no higher than the
- * event. Positions come from an earlier pass (unknown at first).
+ * under the event, in another lane right of it. Positions come from an
+ * earlier pass (unknown at first).
+ *
+ * What follows in the lane starts no further left, but only after a 'when'
+ * on an event earlier in the file: one on a later event would push that
+ * event's own flow right, and itself with it, without end.
  */
-function placeWhen(lane: LaneBoard, { event, reactions }: When, positions: Map<string, Position>): void {
+function placeWhen(lane: LaneBoard, { event, reactions, line }: When, positions: Map<string, Position>): void {
   const pos = positions.get(event);
   const same = pos !== undefined && pos.lane === lane.key;
-  if (pos && !same) lane.y = Math.max(lane.y, pos.y);
-  for (const r of reactions) placeStep(lane, r, same ? pos.x : 0, { text: event });
+  const x = Math.max(pos === undefined ? 0 : same ? pos.x : pos.x + colX(1), lane.minX);
+  for (const r of reactions) placeStep(lane, r, x, { text: event });
+  if (pos !== undefined && pos.line < line) lane.minX = x;
 }
 
 function placeHotspotRow(lane: LaneBoard, hotspots: Hotspot[]): void {
   addStickies(
     lane,
-    hotspots.map((h, i) => sticky('hotspot', h.text, h.line, colX(i), lane.y)),
+    hotspots.map((h, i) => sticky('hotspot', h.text, h.line, lane.minX + colX(i), lane.y)),
   );
   lane.y += STICKY_H + FLOW_GAP;
 }
@@ -320,7 +333,7 @@ function placeAll(board: Board, positions: Map<string, Position>): LaneBoard[] {
   const lane = (key: LaneKey, name: string | null = null, line: number | null = null) => {
     let l = lanes.get(key);
     if (!l) {
-      l = { key, name, line, y: top, stickies: [], bottoms: new Map(), arrows: [], pendingLinks: [] };
+      l = { key, name, line, y: top, stickies: [], bottoms: new Map(), arrows: [], pendingLinks: [], minX: 0 };
       lanes.set(key, l);
     }
     return l;
@@ -359,7 +372,7 @@ function placeAll(board: Board, positions: Map<string, Position>): LaneBoard[] {
         lane(current, item.name, item.line);
         break;
       case 'flow':
-        placeStep(lane(current), item, 0);
+        placeStep(lane(current), item, lane(current).minX);
         lane(current).y += FLOW_GAP;
         break;
       case 'when':
@@ -373,30 +386,119 @@ function placeAll(board: Board, positions: Map<string, Position>): LaneBoard[] {
   return [...lanes.values()];
 }
 
-function laneWidth({ stickies }: LaneBoard): number {
-  return maxOf(
-    stickies.map((s) => s.x + s.w),
-    STICKY_W,
-  );
-}
-
-function shift(dx: number, lane: LaneBoard): LaneBoard {
-  const move = (s: Sticky): Sticky => ({ ...s, x: s.x + dx });
+function shift(dx: number, dy: number, lane: LaneBoard): LaneBoard {
+  const move = (s: Sticky): Sticky => ({ ...s, x: s.x + dx, y: s.y + dy });
   return {
     ...lane,
     stickies: lane.stickies.map(move),
-    arrows: lane.arrows.map((path) => path.map(([x, y]): Point => [x + dx, y])),
+    arrows: lane.arrows.map((path) => path.map(([x, y]): Point => [x + dx, y + dy])),
     pendingLinks: lane.pendingLinks.map((l) => ({ ...l, policy: move(l.policy), groupX: l.groupX + dx })),
   };
 }
 
+/** X near X, or X itself, where a vertical line from Y1 to Y2 crosses no sticky. */
+type Clear = (x: number, y1: number, y2: number) => number;
+
+/** Room kept between a rail and a sticky; hotspots are tilted. */
+const RAIL_ROOM = 6;
+
+/**
+ * A Clear for STICKIES. A rail on a sticky moves into the gap left of it,
+ * and on until it is clear; failing that, right of the stickies instead.
+ */
+function clearOf(stickies: Sticky[]): Clear {
+  const byY = [...stickies].sort((a, b) => a.y - b.y);
+  const tallest = maxOf(
+    stickies.map((s) => s.h),
+    0,
+  );
+  /** Stickies that overlap Y1..Y2 vertically. */
+  const within = (y1: number, y2: number): Sticky[] => {
+    let lo = 0;
+    let hi = byY.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (byY[mid]!.y < y1 - tallest) lo = mid + 1;
+      else hi = mid;
+    }
+    const out: Sticky[] = [];
+    for (let i = lo; i < byY.length && byY[i]!.y < y2; i++) {
+      const s = byY[i]!;
+      if (s.y + s.h > y1) out.push(s);
+    }
+    return out;
+  };
+  const on = (x: number, s: Sticky) => x > s.x - RAIL_ROOM && x < s.x + s.w + RAIL_ROOM;
+  return (x, y1, y2) => {
+    const near = within(y1, y2);
+    for (const step of [-1, 1]) {
+      let rail = x;
+      for (let i = 0; i <= near.length; i++) {
+        const s = near.find((s) => on(rail, s));
+        if (!s) return rail;
+        rail = step < 0 ? s.x - 0.5 * GAP_X : s.x + s.w + 0.5 * GAP_X;
+        if (rail < 0) break;
+      }
+    }
+    return x;
+  };
+}
+
 /** Elbow arrow from the first event sticky named EVENT into POLICY. Cancel links run beside 'when' links. */
-function link(events: Map<string, Sticky>, bottoms: Bottoms, { event, policy, groupX, kind }: PendingLink): Path {
+function link(
+  events: Map<string, Sticky>,
+  bottoms: Bottoms,
+  { event, policy, groupX, kind }: PendingLink,
+  clear: Clear,
+): Path {
   const e = events.get(event)!;
-  return branch(e, bottoms.get(e.y)!, policy, groupX, kind === 'cancel' ? -6 : 6);
+  return branch(e, bottoms.get(e.y)!, policy, groupX, kind === 'cancel' ? -6 : 6, clear);
 }
 
 const MAX_PASSES = 10;
+
+/** Stickies and paths of lanes PLACED on the board, with the links between them drawn round stickies. */
+function connect(placed: LaneBoard[]): Pick<Layout, 'stickies' | 'arrows' | 'links' | 'cancels'> {
+  const stickies = placed.flatMap((l) => l.stickies);
+  const arrows = placed.flatMap((l) => l.arrows);
+  const pending = placed.flatMap((l) => l.pendingLinks);
+  const events = new Map<string, Sticky>();
+  for (const s of stickies) if (s.kind === 'event' && !events.has(s.text)) events.set(s.text, s);
+  const bottoms: Bottoms = new Map();
+  addBottoms(bottoms, stickies);
+  const rails = clearOf(stickies);
+  const links = pending.filter((l) => l.kind === 'link').map((l) => link(events, bottoms, l, rails));
+  const cancels = pending.filter((l) => l.kind === 'cancel').map((l) => link(events, bottoms, l, rails));
+  return { stickies, arrows, links, cancels };
+}
+
+/** The bottom of everything in PARTS. */
+function bottomOf({ stickies, arrows, links, cancels }: Pick<Layout, 'stickies' | 'arrows' | 'links' | 'cancels'>) {
+  return maxOf([...stickies.map((s) => s.y + s.h), ...[...arrows, ...links, ...cancels].flat().map(([, y]) => y)], 0);
+}
+
+/** Lanes placed as bands stacked top to bottom, on one time axis. */
+function swimlanes(lanes: LaneBoard[]): Layout {
+  const bandHs = lanes.map(
+    (l) => maxOf([...l.stickies.map((s) => s.y + s.h), ...l.arrows.flat().map(([, y]) => y)], 0) + GAP_Y,
+  );
+  const bandYs = bandHs.reduce<number[]>((ys, h) => [...ys, ys.at(-1)! + h + SWIMLANE_GAP], [0]);
+  const parts = connect(lanes.map((l, i) => shift(LANE_PAD, bandYs[i]!, l)));
+  const width = parts.stickies.length
+    ? LANE_PAD +
+      maxOf([...parts.stickies.map((s) => s.x + s.w), ...[...parts.links, ...parts.cancels].flat().map(([x]) => x)])
+    : 0;
+  const height = Math.max(bandHs.length ? bandYs.at(-1)! - SWIMLANE_GAP : 0, MARGIN + bottomOf(parts));
+  return {
+    width,
+    height,
+    ...parts,
+    lanes: lanes.flatMap((l, i) =>
+      l.name === null ? [] : [{ name: l.name, line: l.line!, x: 0, y: bandYs[i]!, w: width, h: bandHs[i]! }],
+    ),
+    panels: bandHs.map((h, i) => ({ x: 0, y: bandYs[i]!, w: width, h })),
+  };
+}
 
 /**
  * Lays out a parsed board. Lays out until event positions settle: a 'when'
@@ -412,34 +514,5 @@ export function layout(board: Board): Layout {
     positions = next;
     lanes = placeAll(board, positions);
   }
-
-  const bandWs = lanes.map((l) => laneWidth(l) + 2 * LANE_PAD);
-  const bandXs = bandWs.reduce<number[]>((xs, w) => [...xs, xs.at(-1)! + w + LANE_GAP], [0]);
-  const placed = lanes.map((l, i) => shift(bandXs[i]! + LANE_PAD, l));
-  const stickies = placed.flatMap((l) => l.stickies);
-  const arrows = placed.flatMap((l) => l.arrows);
-  const pending = placed.flatMap((l) => l.pendingLinks);
-  const events = new Map<string, Sticky>();
-  for (const s of stickies) if (s.kind === 'event' && !events.has(s.text)) events.set(s.text, s);
-  const bottoms: Bottoms = new Map();
-  addBottoms(bottoms, stickies);
-  const links = pending.filter((l) => l.kind === 'link').map((l) => link(events, bottoms, l));
-  const cancels = pending.filter((l) => l.kind === 'cancel').map((l) => link(events, bottoms, l));
-  const width = bandWs.length ? bandXs.at(-1)! - LANE_GAP : 0;
-  const height =
-    MARGIN +
-    maxOf([...stickies.map((s) => s.y + s.h), ...[...arrows, ...links, ...cancels].flat().map(([, y]) => y)], 0);
-
-  return {
-    width,
-    height,
-    stickies,
-    arrows,
-    links,
-    cancels,
-    lanes: lanes.flatMap((l, i) =>
-      l.name === null ? [] : [{ name: l.name, line: l.line!, x: bandXs[i]!, y: 0, w: bandWs[i]!, h: height }],
-    ),
-    gaps: bandWs.slice(0, -1).map((w, i) => ({ x: bandXs[i]! + w, y: 0, w: LANE_GAP, h: height })),
-  };
+  return swimlanes(lanes);
 }

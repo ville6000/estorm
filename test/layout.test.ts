@@ -1,6 +1,7 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { LANE_GAP, LANE_PAD, layout } from '../src/layout.ts';
-import type { Sticky } from '../src/layout.ts';
+import { LANE_PAD, layout, SWIMLANE_GAP } from '../src/layout.ts';
+import type { Point, Sticky } from '../src/layout.ts';
 import { parse } from '../src/parser.ts';
 
 const board = (...lines: string[]) => layout(parse(lines.join('\n')));
@@ -136,7 +137,7 @@ describe('layout', () => {
   });
 
   describe('lanes', () => {
-    const { lanes, gaps, stickies, width, height } = board(
+    const { lanes, panels, stickies, width, height } = board(
       'A: Do -> Done',
       '== Sales ==',
       'B: Go -> Gone',
@@ -145,46 +146,30 @@ describe('layout', () => {
       '== Sales ==',
       'D: Walk -> Walked',
     );
-    const inside = (lane: { x: number; w: number }, s: Sticky) => lane.x <= s.x && right(s) <= lane.x + lane.w;
+    const inside = (lane: { y: number; h: number }, s: Sticky) => lane.y <= s.y && s.y + s.h <= lane.y + lane.h;
 
     it('reuses the lane of a reopened section', () => {
       expect(lanes.map((l) => l.name)).toEqual(['Sales', 'Billing']);
     });
 
-    it('puts content before the first section in an unnamed lane on the left', () => {
-      expect(find(stickies, 'Done').x).toBeLessThan(lanes[0]!.x);
+    it('puts content before the first section in an unnamed lane on top', () => {
+      expect(find(stickies, 'Done').y).toBeLessThan(lanes[0]!.y);
     });
 
-    it('places lanes left to right, full height, with gaps between', () => {
-      expect(lanes[0]!.x).toBeLessThan(lanes[1]!.x);
-      expect(lanes.every((l) => l.y === 0 && l.h === height)).toBe(true);
-      expect(width).toBe(lanes[1]!.x + lanes[1]!.w);
-      expect(lanes[1]!.x - (lanes[0]!.x + lanes[0]!.w)).toBe(LANE_GAP);
-      expect(gaps.slice(1)).toEqual([{ x: lanes[0]!.x + lanes[0]!.w, y: 0, w: LANE_GAP, h: height }]);
+    it('stacks lanes top to bottom, full width, each on a panel with space between', () => {
+      expect(lanes[0]!.y + lanes[0]!.h + SWIMLANE_GAP).toBe(lanes[1]!.y);
+      expect(lanes.every((l) => l.x === 0 && l.w === width)).toBe(true);
+      expect(height).toBe(lanes[1]!.y + lanes[1]!.h);
+      expect(panels.slice(1)).toEqual(lanes.map(({ y, h }) => ({ x: 0, y, w: width, h })));
     });
 
-    it('keeps each section inside its lane, starting at the top', () => {
+    it('keeps each section inside its lane, starting at the left', () => {
       expect(inside(lanes[0]!, find(stickies, 'Gone'))).toBe(true);
       expect(inside(lanes[0]!, find(stickies, 'Walked'))).toBe(true);
       expect(inside(lanes[1]!, find(stickies, 'Ran'))).toBe(true);
-      expect(find(stickies, 'Gone').y).toBe(find(stickies, 'Ran').y);
+      expect(find(stickies, 'B', 'actor').x).toBe(LANE_PAD);
+      expect(find(stickies, 'C', 'actor').x).toBe(LANE_PAD);
     });
-  });
-
-  it('starts a when in another lane at its left edge, level with the event', () => {
-    const { stickies, lanes, links } = board(
-      '== Sales ==',
-      'A: Do -> Done',
-      'B: Go -> Gone',
-      '== Billing ==',
-      'C: Run -> Ran',
-      'when Gone',
-      '  then D -> DDone',
-    );
-    const policy = find(stickies, 'whenever Gone');
-    expect(policy.x).toBe(lanes[1]!.x + LANE_PAD);
-    expect(policy.y).toBe(find(stickies, 'Gone', 'event').y);
-    expect(links).toHaveLength(1);
   });
 
   describe('when links', () => {
@@ -251,4 +236,73 @@ describe('layout', () => {
       expect(right(schedule)).toBe(find(stickies, 'Go').x);
     });
   });
+});
+
+describe('across lanes', () => {
+  const lanes = (...lines: string[]) => layout(parse(lines.join('\n')));
+
+  /** Whether segment A-B of an axis-aligned path runs through the inside of S. */
+  const through = ([ax, ay]: Point, [bx, by]: Point, s: Sticky) =>
+    Math.max(ax, bx) > s.x + 1 &&
+    Math.min(ax, bx) < s.x + s.w - 1 &&
+    Math.max(ay, by) > s.y + 1 &&
+    Math.min(ay, by) < s.y + s.h - 1;
+
+  const overlap = (a: Sticky, b: Sticky) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+  it("starts a 'when' in another lane right of its event, on the lane's next free row", () => {
+    const { stickies } = lanes(
+      '== Sales ==',
+      'A: Do -> Done',
+      '== Billing ==',
+      'B: Bill -> Billed',
+      'when Done',
+      '  then Charge -> Charged',
+    );
+    const policy = find(stickies, 'whenever Done');
+    expect(policy.x).toBeGreaterThan(right(find(stickies, 'Done')));
+    expect(policy.y).toBeGreaterThan(find(stickies, 'Billed').y);
+  });
+
+  it('places a when whose event comes later in the file', () => {
+    const { stickies } = lanes(
+      '== Billing ==',
+      'when Done',
+      '  then Charge -> Charged',
+      '== Sales ==',
+      'A: Do -> Done',
+    );
+    expect(find(stickies, 'whenever Done').x).toBeGreaterThan(right(find(stickies, 'Done')));
+  });
+
+  it('never starts a flow left of the one above it in its lane', () => {
+    const { stickies } = lanes(
+      '== Sales ==',
+      'A: Do -> Done',
+      '== Billing ==',
+      'when Done',
+      '  then Charge -> Charged',
+      'B: Bill -> Billed',
+    );
+    expect(find(stickies, 'B').x).toBe(find(stickies, 'whenever Done').x);
+  });
+
+  it('keeps reactions in a lane under their event', () => {
+    const { stickies } = lanes('A: Do -> Done', '  then B -> BDone');
+    expect(find(stickies, 'whenever Done').x).toBe(find(stickies, 'Done').x);
+  });
+
+  it.each(readdirSync('examples').filter((f) => f.endsWith('.estorm')))(
+    '%s has no overlapping stickies and no links through stickies',
+    (f) => {
+      const l = layout(parse(readFileSync(`examples/${f}`, 'utf8')));
+      const pairs = l.stickies.flatMap((a, i) => l.stickies.slice(i + 1).filter((b) => overlap(a, b)));
+      expect(pairs).toEqual([]);
+      for (const path of [...l.links, ...l.cancels]) {
+        for (let i = 1; i < path.length; i++) {
+          expect(l.stickies.filter((s) => through(path[i - 1]!, path[i]!, s))).toEqual([]);
+        }
+      }
+    },
+  );
 });
