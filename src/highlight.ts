@@ -66,8 +66,8 @@ export function tokenize(line: string): Token[] {
     }
   } else if (word('every')) {
     add('keyword', start, start + 5);
-    const colon = line.indexOf(': ', start + 6);
-    if (colon === -1) {
+    const colon = line.lastIndexOf(':');
+    if (colon < start + 6) {
       add('schedule', start + 6, line.length);
     } else {
       add('schedule', start + 6, colon);

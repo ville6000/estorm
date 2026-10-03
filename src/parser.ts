@@ -207,7 +207,8 @@ function classify(n: number, raw: string): Stmt | null {
       ...(unless !== undefined && { unless }),
     };
   }
-  if ((m = text.match(/^every\s+(.+?):\s+(.*)$/))) {
+  // The last colon ends the schedule: names have none, but times like 02:00 do.
+  if ((m = text.match(/^every\s+(.+):\s*(.*)$/))) {
     return { ...base, type: 'flow', schedule: m[1]!.trim(), ...parseChain(n, m[2]!) };
   }
   if ((m = text.match(/^then\s+(.+)$/))) {

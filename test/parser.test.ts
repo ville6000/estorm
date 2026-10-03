@@ -268,6 +268,14 @@ describe('parse', () => {
       expect(flow).toMatchObject({ type: 'flow', schedule: 'night at 02:00', command: 'Archive', event: 'Archived' });
       expect(flow).not.toHaveProperty('actor');
     });
+
+    it('ends a schedule at the last colon, with or without a space after it', () => {
+      expect(parse('every day:Archive -> Archived')[0]).toMatchObject({ schedule: 'day', command: 'Archive' });
+      expect(parse('every night at 02:00:Archive -> Archived')[0]).toMatchObject({
+        schedule: 'night at 02:00',
+        command: 'Archive',
+      });
+    });
   });
 
   it.each<[number, string, string]>([

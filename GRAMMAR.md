@@ -72,7 +72,8 @@ somewhere in the file; a red dotted arrow links it to the delayed policies.
 ```
 
 **Schedule** — a flow driven by time instead of an actor. SCHEDULE is free
-text and may contain colons; a colon followed by a space ends it.
+text and may contain colons, as in a time; the last colon on the line ends
+it, since the names after it have none.
 
 ```
 every night at 02:00: Command -> Event
@@ -182,7 +183,7 @@ flow       = [ name , ":" ] , name , chain ;
 reaction   = indent , "then" , " " , name , chain ;
 when       = "when" , " " , name ;
 after      = indent , "after" , " " , text , [ " unless " , name ] ;
-schedule   = "every" , " " , text , ": " , name , chain ;
+schedule   = "every" , " " , text , ":" , name , chain ;
 section    = "==" , text , "==" ;
 event      = name ;
 
