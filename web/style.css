@@ -325,7 +325,12 @@ select:focus-visible {
 
 .board svg {
   display: block;
-  box-shadow: 0 1px 3px var(--shadow);
+  overflow: visible;
+}
+
+/* The board and its legend are separate boxes, each with a shadow. */
+.board svg .background {
+  filter: drop-shadow(0 1px 3px var(--shadow));
 }
 
 .board svg g[data-line] {

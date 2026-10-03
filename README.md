@@ -79,6 +79,9 @@ sticky to jump to its line, open and save `.estorm` files, export SVG,
 switch to the [timeline view](GRAMMAR.md#timeline-view) and open a summary of lint warnings, actors, aggregates, context
 dependencies, gaps and hotspots.
 
+A legend above the board names the sticky colours and arrow styles it uses,
+so exported images make sense to people who don't know the notation.
+
 **Share** copies a link that opens the board for anyone. The board is
 compressed into the link's `#` fragment, which browsers never send to a
 server, so it is not uploaded anywhere. Links from the downloaded file
@@ -114,6 +117,7 @@ estorm render docs/*.estorm       # one SVG next to each file
 estorm render board.estorm -o -   # SVG to stdout
 estorm render -t board.estorm     # timeline view, to board.timeline.svg
 estorm render board.estorm --theme auto   # dark when the viewer's is (also: light, dark)
+estorm render board.estorm --no-legend     # without the key to sticky colours and arrows
 estorm check docs/*.estorm        # errors only, for CI
 estorm lint docs/*.estorm         # errors and modelling warnings
 estorm summary board.estorm       # actors, aggregates, gaps, hotspots
@@ -190,6 +194,7 @@ import { parse, parseAll, layout, svg, render, renderTimeline, summarize, lint, 
 
 const doc = render(text); // parse -> layout -> svg
 const dark = render(text, { theme: 'dark' }); // or 'auto': follows prefers-color-scheme
+const bare = render(text, { legend: false }); // without the key to sticky colours and arrows
 const events = renderTimeline(text); // parse -> timeline -> svg
 const prose = summarize(parse(text)); // Markdown overview
 const warnings = lint(parse(text)); // [{ line, message }]

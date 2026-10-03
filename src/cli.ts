@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { parseArgs } from 'node:util';
 import { lint, parse, parseAll, ParseError, render, renderTimeline, summarize } from './index.ts';
-import type { Theme } from './index.ts';
+import type { SvgOptions, Theme } from './index.ts';
 import { serveStdio } from './lsp.ts';
 
 const USAGE = `Usage:
@@ -25,6 +25,7 @@ Options:
   -t, --timeline      render the timeline: events only, sections as swimlanes
   --theme <theme>     light (default for render), dark, or auto: follows the
                       viewer's colour scheme (default for serve)
+  --no-legend         leave out the key to sticky colours and arrows
   -p, --port <port>   preview port (default 8080)
   -h, --help          show this help
   -v, --version       show the version`;
@@ -74,12 +75,12 @@ function parseTheme(value: string | undefined, fallback: Theme): Theme {
   return value as Theme;
 }
 
-function renderFiles(files: string[], out: string | undefined, timeline = false, theme: Theme = 'light'): number {
+function renderFiles(files: string[], out: string | undefined, timeline: boolean, options: SvgOptions): number {
   if (files.length === 0) throw new UsageError('render needs at least one file');
   if (out !== undefined && files.length > 1) throw new UsageError('-o works with a single file only');
   let failed = 0;
   for (const file of files) {
-    const result = compile(file, (text) => (timeline ? renderTimeline : render)(text, { theme }));
+    const result = compile(file, (text) => (timeline ? renderTimeline : render)(text, options));
     if ('error' in result) {
       console.error(result.error);
       failed++;
@@ -190,14 +191,14 @@ const PREVIEW = (file: string) => `<!doctype html>
 </html>`;
 
 /** Serves a live preview of FILE; the page re-renders it every second. */
-function serve(files: string[], port: number, theme: Theme = 'auto'): Promise<number> {
+function serve(files: string[], port: number, options: SvgOptions): Promise<number> {
   const [file] = files;
   if (files.length !== 1 || file === undefined) throw new UsageError('serve needs exactly one file');
   const server = createServer((req, res) => {
     if (req.url === '/') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(PREVIEW(file));
     } else if (req.url === '/diagram.svg') {
-      const result = compile(file, (text) => render(text, { theme }));
+      const result = compile(file, (text) => render(text, options));
       if ('error' in result) {
         res.writeHead(422, { 'Content-Type': 'text/plain; charset=utf-8' }).end(result.error);
       } else {
@@ -225,10 +226,12 @@ async function main(argv: string[]): Promise<number> {
   const { values, positionals } = parseArgs({
     args: argv,
     allowPositionals: true,
+    allowNegative: true,
     options: {
       out: { type: 'string', short: 'o' },
       timeline: { type: 'boolean', short: 't' },
       theme: { type: 'string' },
+      legend: { type: 'boolean', default: true },
       port: { type: 'string', short: 'p', default: '8080' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
@@ -247,7 +250,10 @@ async function main(argv: string[]): Promise<number> {
   const [command, ...files] = positionals;
   switch (command) {
     case 'render':
-      return renderFiles(files, values.out, values.timeline, parseTheme(values.theme, 'light'));
+      return renderFiles(files, values.out, values.timeline ?? false, {
+        theme: parseTheme(values.theme, 'light'),
+        legend: values.legend,
+      });
     case 'check':
       return check(files);
     case 'lint':
@@ -257,7 +263,7 @@ async function main(argv: string[]): Promise<number> {
     case 'serve': {
       const port = Number(values.port);
       if (!Number.isInteger(port) || port < 1 || port > 65535) throw new UsageError(`invalid port: ${values.port}`);
-      return serve(files, port, parseTheme(values.theme, 'auto'));
+      return serve(files, port, { theme: parseTheme(values.theme, 'auto'), legend: values.legend });
     }
     case 'lsp':
       serveStdio();

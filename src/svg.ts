@@ -32,7 +32,38 @@ export type Theme = 'light' | 'dark' | 'auto';
 
 export interface SvgOptions {
   theme?: Theme;
+  /** A key to the sticky colours and arrow styles on the board, below it. On by default. */
+  legend?: boolean;
 }
+
+/** Names in the legend, in the order a flow reads. */
+const KIND_NAMES: [Kind, string][] = [
+  ['actor', 'Actor'],
+  ['schedule', 'Schedule'],
+  ['read-model', 'Read model'],
+  ['policy', 'Policy'],
+  ['command', 'Command'],
+  ['aggregate', 'Aggregate'],
+  ['external', 'External system'],
+  ['event', 'Event'],
+  ['hotspot', 'Hotspot'],
+];
+
+const LEGEND_FONT_SIZE = 12;
+const LEGEND_ROW_H = 24;
+const SWATCH = 14;
+/** Length of an arrow sample. */
+const LINE_SAMPLE = 28;
+/** Between a sample and its name, and between items. */
+const LEGEND_GAP = 6;
+const LEGEND_ITEM_GAP = 20;
+/** A narrow board's legend may be wider than the board, up to this. */
+const LEGEND_MIN_W = 480;
+/** Inside the legend's box, around its items. */
+const LEGEND_PAD_X = 16;
+const LEGEND_PAD_Y = 8;
+/** Between the legend's box and the board. */
+const LEGEND_SPACE = 32;
 
 /** Colours of everything but the stickies, which keep theirs (and dark text) in both themes. */
 interface Palette {
@@ -74,6 +105,7 @@ function darkStyle(p: Palette): string {
       ` .estorm .background { fill: ${p.background} }` +
       ` .estorm .gap { fill: ${p.gap} }` +
       ` .estorm .lane text { fill: ${p.lane} }` +
+      ` .estorm .legend text { fill: ${p.lane} }` +
       ` .estorm .arrow { stroke: ${p.arrow} }` +
       ` .estorm .link { stroke: ${p.link} }` +
       ` .estorm .cancel { stroke: ${p.cancel} }` +
@@ -251,12 +283,88 @@ function defs(p: Palette): string {
   ]);
 }
 
+interface LegendItem {
+  name: string;
+  /** Draws the sample at X, centred on Y. */
+  sample: (x: number, y: number) => string;
+  sampleW: number;
+}
+
+/** Legend items for the sticky kinds and arrow styles in LAYOUT, and none for what it lacks. */
+function legendItems({ stickies, arrows, links, cancels }: Layout, p: Palette): LegendItem[] {
+  const kinds = new Set(stickies.map((s) => s.kind));
+  const swatch = (kind: Kind) => (x: number, y: number) =>
+    el('rect', { x, y: y - 0.5 * SWATCH, width: SWATCH, height: SWATCH, fill: COLORS[kind] });
+  const line = (draw: (points: Path, p: Palette) => string) => (x: number, y: number) =>
+    draw(
+      [
+        [x, y],
+        [x + LINE_SAMPLE, y],
+      ],
+      p,
+    );
+  return [
+    ...KIND_NAMES.filter(([kind]) => kinds.has(kind)).map(([kind, name]) => ({
+      name,
+      sample: swatch(kind),
+      sampleW: SWATCH,
+    })),
+    ...(arrows.length ? [{ name: 'Flow', sample: line(arrow), sampleW: LINE_SAMPLE }] : []),
+    ...(links.length ? [{ name: 'Reaction (when)', sample: line(link), sampleW: LINE_SAMPLE }] : []),
+    ...(cancels.length ? [{ name: 'Cancel (unless)', sample: line(cancel), sampleW: LINE_SAMPLE }] : []),
+  ];
+}
+
+/**
+ * The legend above LAYOUT, outside its lanes: items left to right, wrapping
+ * into rows, on a box of the background colour only as wide as they need.
+ * It may be wider than the board on narrow boards.
+ */
+function legend(layout: Layout, p: Palette): { body: string; width: number; height: number } {
+  const items = legendItems(layout, p);
+  if (!items.length) return { body: '', width: 0, height: 0 };
+  const right = Math.max(layout.width, LEGEND_MIN_W) - LEGEND_PAD_X;
+  const out: string[] = [];
+  let x = LEGEND_PAD_X;
+  let row = 0;
+  let width = 0;
+  for (const { name, sample, sampleW } of items) {
+    const w = sampleW + LEGEND_GAP + name.length * 0.55 * LEGEND_FONT_SIZE;
+    if (x > LEGEND_PAD_X && x + w > right) {
+      x = LEGEND_PAD_X;
+      row++;
+    }
+    const y = LEGEND_PAD_Y + (row + 0.5) * LEGEND_ROW_H;
+    out.push(
+      sample(x, y),
+      el(
+        'text',
+        { x: x + sampleW + LEGEND_GAP, y: y + 0.35 * LEGEND_FONT_SIZE, 'font-size': LEGEND_FONT_SIZE, fill: p.lane },
+        escape(name),
+      ),
+    );
+    width = Math.max(width, x + w + LEGEND_PAD_X);
+    x += w + LEGEND_ITEM_GAP;
+  }
+  width = Math.ceil(width);
+  const boxH = (row + 1) * LEGEND_ROW_H + 2 * LEGEND_PAD_Y;
+  return {
+    body: el('g', { class: 'legend' }, [
+      el('rect', { class: 'background', width, height: boxH, fill: p.background }),
+      ...out,
+    ]),
+    width,
+    height: boxH + LEGEND_SPACE,
+  };
+}
+
 /** Layout into a standalone SVG document string, light unless OPTIONS say otherwise. */
-export function svg(
-  { width, height, stickies, arrows, links, cancels, lanes, gaps }: Layout,
-  { theme = 'light' }: SvgOptions = {},
-): string {
+export function svg(layout: Layout, { theme = 'light', legend: withLegend = true }: SvgOptions = {}): string {
+  const { stickies, arrows, links, cancels, lanes, gaps } = layout;
   const p = PALETTES[theme === 'dark' ? 'dark' : 'light'];
+  const key = withLegend ? legend(layout, p) : { body: '', width: 0, height: 0 };
+  const width = Math.max(layout.width, key.width);
+  const height = layout.height + key.height;
   return el(
     'svg',
     {
@@ -270,13 +378,17 @@ export function svg(
     [
       ...(theme === 'auto' ? [darkStyle(PALETTES.dark)] : []),
       defs(p),
-      el('rect', { class: 'background', width: '100%', height: '100%', fill: p.background }),
-      ...gaps.map((g) => gap(g, p)),
-      ...lanes.map((l) => lane(l, p)),
-      ...arrows.map((a) => arrow(a, p)),
-      ...links.map((l) => link(l, p)),
-      ...cancels.map((c) => cancel(c, p)),
-      ...stickies.map(sticky),
+      key.body,
+      // The board moves down to make room for the legend.
+      el('g', { transform: key.height ? `translate(0 ${key.height})` : undefined }, [
+        el('rect', { class: 'background', width, height: layout.height, fill: p.background }),
+        ...gaps.map((g) => gap(g, p)),
+        ...lanes.map((l) => lane(l, p)),
+        ...arrows.map((a) => arrow(a, p)),
+        ...links.map((l) => link(l, p)),
+        ...cancels.map((c) => cancel(c, p)),
+        ...stickies.map(sticky),
+      ]),
     ],
   );
 }

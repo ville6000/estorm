@@ -61,7 +61,7 @@ describe('themes', () => {
 
   it('is light by default, without a stylesheet', () => {
     const doc = render(text);
-    expect(doc).toContain('class="background" width="100%" height="100%" fill="#ffffff"');
+    expect(doc).toMatch(/class="background" width="\d+" height="\d+" fill="#ffffff"/);
     expect(doc).not.toContain('<style');
   });
 
@@ -78,5 +78,58 @@ describe('themes', () => {
     expect(doc).toContain('fill="#ffffff"');
     expect(doc).toContain('@media (prefers-color-scheme: dark)');
     expect(doc).toContain('.estorm .background { fill: #1a1b1e }');
+  });
+});
+
+describe('legend', () => {
+  const names = (doc: string) =>
+    [...(doc.match(/<g class="legend">.*?<\/g>/)?.[0] ?? '').matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
+
+  it('lists the sticky kinds and arrow styles on the board, in flow order', () => {
+    const doc = render('A: Do -> (Order) -> Done\n  after 1 day unless Gone\n    then B -> BDone\nX: Go -> Gone');
+    expect(names(doc)).toEqual(['Actor', 'Policy', 'Command', 'Aggregate', 'Event', 'Flow', 'Cancel (unless)']);
+  });
+
+  it('lists when links', () => {
+    const doc = render('== Sales ==\nA: Do -> Done\n== Billing ==\nwhen Done\n  then B -> BDone');
+    expect(names(doc)).toContain('Reaction (when)');
+  });
+
+  it('adds to the height and, on narrow boards, the width', () => {
+    const board = render('Done', { legend: false });
+    const doc = render('Done');
+    const size = (d: string) =>
+      d
+        .match(/width="(\d+)" height="(\d+)"/)!
+        .slice(1)
+        .map(Number);
+    expect(size(doc)[1]).toBeGreaterThan(size(board)[1]!);
+    expect(size(doc)[0]).toBeGreaterThanOrEqual(size(board)[0]!);
+  });
+
+  it('goes above the board, which moves down to make room', () => {
+    const doc = render('A: Do -> Done');
+    expect(doc.indexOf('class="legend"')).toBeLessThan(doc.indexOf('class="actor"'));
+    expect(doc).toMatch(/<g transform="translate\(0 \d+\)">/);
+    expect(render('A: Do -> Done', { legend: false })).not.toContain('translate(');
+  });
+
+  it('has a background only as wide as its items', () => {
+    const doc = render('Done ' + 'Then '.repeat(8));
+    const box = doc.match(/<g class="legend"><rect class="background" width="(\d+)"/);
+    const board = doc.match(/<g transform[^>]*><rect class="background" width="(\d+)"/);
+    expect(Number(box![1])).toBeLessThan(Number(board![1]));
+  });
+
+  it('can be left out', () => {
+    expect(render('A: Do -> Done', { legend: false })).not.toContain('class="legend"');
+  });
+
+  it('is left out of empty boards', () => {
+    expect(render('')).not.toContain('class="legend"');
+  });
+
+  it('follows the colour scheme on auto', () => {
+    expect(render('A: Do -> Done', { theme: 'auto' })).toContain('.estorm .legend text { fill: #c1c2c5 }');
   });
 });
