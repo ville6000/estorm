@@ -4,7 +4,8 @@
  *
  * This file holds the app's state and wires the page to it; the parts live in
  * codemirror.ts (the source editor), files.ts (open, save, export), html.ts
- * (panel contents), prefs.ts (local storage), share.ts (links) and zoom.ts.
+ * (panel contents), pan.ts (pan and zoom gestures), prefs.ts (local storage),
+ * share.ts (links) and zoom.ts.
  */
 import { EditorView } from '@codemirror/view';
 import {
@@ -24,7 +25,8 @@ import { canPick, download, type FileHandle, pickFile, pickSaveFile, svgToPng, w
 import { errorsHtml, summaryHtml, warningsHtml } from './html.ts';
 import * as prefs from './prefs.ts';
 import { decode, encode } from './share.ts';
-import { zoomStep, zoomToFit } from './zoom.ts';
+import { type BoardView, panAndZoom } from './pan.ts';
+import { boardAt, clampZoom, scrollFor, zoomStep, zoomToFit, zoomToFitArea } from './zoom.ts';
 
 // Where links from the downloaded file point, since file:// links don't work for others.
 const PUBLIC_URL = 'https://ville6000.github.io/estorm/';
@@ -37,6 +39,9 @@ const examples = Object.fromEntries(
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const board = $<HTMLDivElement>('board');
+const pane = board.parentElement!;
+/** The board's padding, unscaled, around the SVG. */
+const BOARD_PAD = 16;
 const errorList = $<HTMLDivElement>('errors');
 const fileName = $<HTMLSpanElement>('file-name');
 const fileInput = $<HTMLInputElement>('file-input');
@@ -117,13 +122,65 @@ function applyZoom(): void {
   zoomReset.textContent = `${Math.round(state.zoom * 100)}%`;
 }
 
+/** The board in the pane, for pan and zoom gestures. */
+const boardView: BoardView = {
+  zoom: () => state.zoom,
+  boardAt(x, y) {
+    const r = pane.getBoundingClientRect();
+    return {
+      x: boardAt(pane.scrollLeft, x - r.left, state.zoom, BOARD_PAD),
+      y: boardAt(pane.scrollTop, y - r.top, state.zoom, BOARD_PAD),
+    };
+  },
+  place(zoom, board, x, y) {
+    const r = pane.getBoundingClientRect();
+    state.zoom = clampZoom(zoom);
+    applyZoom();
+    pane.scrollLeft = scrollFor(board.x, x - r.left, state.zoom, BOARD_PAD);
+    pane.scrollTop = scrollFor(board.y, y - r.top, state.zoom, BOARD_PAD);
+  },
+};
+
+/** Zooms to ZOOM keeping the board point in the middle of the pane in place. */
 function setZoom(zoom: number): void {
-  state.zoom = zoom;
+  const r = pane.getBoundingClientRect();
+  const x = r.left + 0.5 * pane.clientWidth;
+  const y = r.top + 0.5 * pane.clientHeight;
+  boardView.place(zoom, boardView.boardAt(x, y), x, y);
+}
+
+/** Zooms to ZOOM with the board point X, Y (in board pixels) at the top left. */
+function showAt(zoom: number, x: number, y: number): void {
+  state.zoom = clampZoom(zoom);
   applyZoom();
+  pane.scrollLeft = x * state.zoom;
+  pane.scrollTop = y * state.zoom;
 }
 
 function fitBoard(): void {
-  if (state.size.width) setZoom(zoomToFit(board.parentElement!.clientWidth - 32, state.size.width));
+  if (state.size.width) showAt(zoomToFit(pane.clientWidth - 2 * BOARD_PAD, state.size.width), 0, 0);
+}
+
+/** Fits the lane whose label is LABEL into the pane. */
+function fitLane(label: Element): void {
+  const svgEl = board.querySelector('svg')!;
+  const at = label.getBoundingClientRect();
+  const panel = [...svgEl.querySelectorAll('rect.background')]
+    .map((p) => p.getBoundingClientRect())
+    .find((p) => p.left <= at.left && at.right <= p.right && p.top <= at.top && at.bottom <= p.bottom);
+  if (!panel) return;
+  const origin = svgEl.getBoundingClientRect();
+  const z = state.zoom;
+  showAt(
+    zoomToFitArea(
+      pane.clientWidth - 2 * BOARD_PAD,
+      pane.clientHeight - 2 * BOARD_PAD,
+      panel.width / z,
+      panel.height / z,
+    ),
+    (panel.left - origin.left) / z,
+    (panel.top - origin.top) / z,
+  );
 }
 
 // --- files -------------------------------------------------------------------
@@ -268,6 +325,11 @@ function setTimeline(timeline: boolean): void {
 }
 
 jumpsToLines(board);
+board.addEventListener('click', (e) => {
+  const label = (e.target as Element).closest('.lane');
+  if (label) fitLane(label);
+});
+panAndZoom(pane, boardView);
 jumpsToLines(warningList);
 jumpsToLines(errorList);
 

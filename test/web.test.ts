@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { ParseError } from '../src/index.ts';
 import { errorsHtml, escape, summaryHtml, warningsHtml } from '../web/html.ts';
-import { ZOOMS, zoomStep, zoomToFit } from '../web/zoom.ts';
+import {
+  boardAt,
+  clampZoom,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  scrollFor,
+  wheelFactor,
+  ZOOMS,
+  zoomStep,
+  zoomToFit,
+  zoomToFitArea,
+} from '../web/zoom.ts';
 
 describe('html', () => {
   it('escapes markup', () => {
@@ -40,12 +51,38 @@ describe('zoom', () => {
   it('steps from a level in between, as after fitting', () => {
     expect(zoomStep(0.9, 1)).toBe(1.25);
     expect(zoomStep(0.9, -1)).toBe(0.8);
-    expect(zoomStep(5, -1)).toBe(1.5);
+    expect(zoomStep(5, -1)).toBe(3);
   });
 
   it('fits the width, between 10% and 200%', () => {
     expect(zoomToFit(500, 1000)).toBe(0.5);
     expect(zoomToFit(5000, 100)).toBe(2);
     expect(zoomToFit(10, 1000)).toBe(0.1);
+  });
+
+  it('fits an area by its tighter side', () => {
+    expect(zoomToFitArea(1000, 300, 1000, 600)).toBe(0.5);
+    expect(zoomToFitArea(5000, 5000, 100, 100)).toBe(2);
+  });
+
+  it('keeps free zoom between 10% and 400%', () => {
+    expect(clampZoom(0.01)).toBe(MIN_ZOOM);
+    expect(clampZoom(9)).toBe(MAX_ZOOM);
+    expect(clampZoom(1.1)).toBe(1.1);
+  });
+
+  it('maps between scroll and board points, at any zoom', () => {
+    // 50 px into a pane scrolled by 200, with 16 px padding.
+    expect(boardAt(200, 50, 1, 16)).toBe(234);
+    expect(boardAt(200, 50, 2, 16)).toBe(117);
+    expect(scrollFor(234, 50, 1, 16)).toBe(200);
+    expect(scrollFor(boardAt(200, 50, 1.25, 16), 50, 1.25, 16)).toBe(200);
+  });
+
+  it('zooms in on wheel up, out on wheel down, by at most a step at a time', () => {
+    expect(wheelFactor(-100)).toBeGreaterThan(1);
+    expect(wheelFactor(100)).toBeLessThan(1);
+    expect(wheelFactor(1000)).toBe(wheelFactor(100));
+    expect(wheelFactor(-4)).toBeLessThan(wheelFactor(-100));
   });
 });
