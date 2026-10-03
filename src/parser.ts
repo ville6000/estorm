@@ -119,9 +119,13 @@ type Item = Via | { type: 'name'; name: string };
 
 /** One chain item: (Aggregate), [External] or a bare name. null if invalid. */
 function parseItem(s: string): Item | null {
+  const named = (type: Via['type'], raw: string): Item | null => {
+    const name = raw.trim();
+    return NAME.test(name) ? { type, name } : null;
+  };
   let m: RegExpMatchArray | null;
-  if ((m = s.match(/^\((.+)\)$/))) return { type: 'aggregate', name: m[1]!.trim() };
-  if ((m = s.match(/^\[(.+)\]$/))) return { type: 'external', name: m[1]!.trim() };
+  if ((m = s.match(/^\((.*)\)$/))) return named('aggregate', m[1]!);
+  if ((m = s.match(/^\[(.*)\]$/))) return named('external', m[1]!);
   if (NAME.test(s)) return { type: 'name', name: s };
   return null;
 }
