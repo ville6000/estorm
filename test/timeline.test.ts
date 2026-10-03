@@ -31,7 +31,7 @@ describe('timeline', () => {
   });
 
   it('lines up events across sections, as swimlanes', () => {
-    const { stickies, lanes, gaps, links } = board(
+    const { stickies, lanes, panels, links } = board(
       '== Sales ==',
       'C: Place order -> OrderPlaced',
       '== Payments ==',
@@ -46,7 +46,7 @@ describe('timeline', () => {
     expect(new Set(lanes.map((l) => l.x))).toEqual(new Set([0]));
     expect(lanes[0]!.y + lanes[0]!.h).toBeLessThanOrEqual(lanes[1]!.y);
     expect(at(stickies, 'PaymentCaptured').y).toBeGreaterThan(lanes[1]!.y);
-    expect(gaps).toHaveLength(2);
+    expect(panels.map(({ y, h }) => [y, h])).toEqual(lanes.map(({ y, h }) => [y, h]));
     expect(links).toHaveLength(2);
   });
 
@@ -99,9 +99,9 @@ describe('timeline', () => {
   });
 
   it('labels no lanes on a board without sections', () => {
-    const { lanes, gaps } = board('A: Do -> Done');
+    const { lanes, panels } = board('A: Do -> Done');
     expect(lanes).toEqual([]);
-    expect(gaps).toEqual([]);
+    expect(panels).toHaveLength(1);
   });
 
   it('is empty for an empty board', () => {

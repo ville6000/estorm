@@ -67,6 +67,39 @@ describe('a board of about 100,000 lines', () => {
   });
 });
 
+describe('a big board', () => {
+  const l = layout(parse(bigBoard(4, 40)));
+
+  it('has no overlapping stickies', () => {
+    const byY = [...l.stickies].sort((a, b) => a.y - b.y);
+    const overlaps = byY.flatMap((a, i) =>
+      byY
+        .slice(i + 1)
+        .filter((b) => b.y < a.y + a.h && a.x < b.x + b.w && b.x < a.x + a.w)
+        .map((b) => [a.text, b.text]),
+    );
+    expect(overlaps).toEqual([]);
+  });
+
+  it('has no links through stickies', () => {
+    const crossed = [...l.links, ...l.cancels].flatMap((path) =>
+      path.slice(1).flatMap(([bx, by], i) => {
+        const [ax, ay] = path[i]!;
+        return l.stickies
+          .filter(
+            (s) =>
+              Math.max(ax, bx) > s.x + 1 &&
+              Math.min(ax, bx) < s.x + s.w - 1 &&
+              Math.max(ay, by) > s.y + 1 &&
+              Math.min(ay, by) < s.y + s.h - 1,
+          )
+          .map((s) => s.text);
+      }),
+    );
+    expect(crossed).toEqual([]);
+  });
+});
+
 describe('long lines', () => {
   it.each([
     ['a section', `== ${' '.repeat(50_000)}x`],

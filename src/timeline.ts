@@ -8,16 +8,14 @@
  * Events of a section that share a column stack, in source order.
  */
 import type { Board, Step } from './parser.ts';
-import type { Lane, Layout, Path, Point, Rect, Sticky } from './layout.ts';
-import { GAP_Y, LANE_LABEL_H, LANE_PAD, MARGIN, STICKY_H, STICKY_W } from './layout.ts';
+import type { Lane, Layout, Path, Point, Sticky } from './layout.ts';
+import { GAP_Y, LANE_LABEL_H, LANE_PAD, MARGIN, STICKY_H, STICKY_W, SWIMLANE_GAP } from './layout.ts';
 import { maxOf } from './text.ts';
 
 /** Between columns: room for the arrows that turn there. */
 export const COL_GAP = 60;
 /** How far links run beside arrows. */
 const LINK_OFFSET = 10;
-/** Between swimlanes. */
-export const SWIMLANE_GAP = 20;
 
 type LaneKey = string | null;
 
@@ -170,7 +168,6 @@ export function timeline(board: Board): Layout {
 
   const stickies: Sticky[] = [];
   const lanes: Lane[] = [];
-  const gaps: Rect[] = [];
   const bands: { key: LaneKey; y: number; h: number }[] = [];
   let y = 0;
   for (const key of g.lanes) {
@@ -194,13 +191,11 @@ export function timeline(board: Board): Layout {
       });
     }
     const h = head + rows * STICKY_H + (rows - 1) * GAP_Y + MARGIN;
-    if (bands.length) gaps.push({ x: 0, y: y - SWIMLANE_GAP, w: 0, h: SWIMLANE_GAP });
     bands.push({ key, y, h });
     y += h + SWIMLANE_GAP;
   }
 
   const width = stickies.length ? maxOf(stickies.map((s) => s.x + s.w)) + LANE_PAD : 0;
-  for (const gap of gaps) gap.w = width;
   for (const b of bands) {
     if (b.key !== null) {
       const section = board.find((i) => i.type === 'section' && i.name === b.key)!;
@@ -225,5 +220,6 @@ export function timeline(board: Board): Layout {
   }
 
   const height = bands.length ? y - SWIMLANE_GAP : MARGIN;
-  return { width, height, stickies, arrows, links, cancels: [], lanes, gaps };
+  const panels = bands.map((b) => ({ x: 0, y: b.y, w: width, h: b.h }));
+  return { width, height, stickies, arrows, links, cancels: [], lanes, panels };
 }

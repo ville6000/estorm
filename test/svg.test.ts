@@ -41,7 +41,7 @@ describe('svg', () => {
     const doc = render('== Sales ==\nA: Do -> Done\n== Billing ==\nwhen Done\n  then B -> BDone');
     expect(doc).toContain('>Billing</text>');
     expect(doc).toContain('class="link"');
-    expect(doc).toContain('class="gap"');
+    expect(doc.match(/class="background"/g)).toHaveLength(3); // the legend's, and one per lane
   });
 
   it('lists rules inside their aggregate', () => {
@@ -117,7 +117,7 @@ describe('legend', () => {
   it('has a background only as wide as its items', () => {
     const doc = render('Done ' + 'Then '.repeat(8));
     const box = doc.match(/<g class="legend"><rect class="background" width="(\d+)"/);
-    const board = doc.match(/<g transform[^>]*><rect class="background" width="(\d+)"/);
+    const board = doc.match(/<g transform[^>]*><rect class="background" x="0" y="0" width="(\d+)"/);
     expect(Number(box![1])).toBeLessThan(Number(board![1]));
   });
 
