@@ -465,9 +465,10 @@ const MAX_PASSES = 10;
 function connect(placed: LaneBoard[]): Pick<Layout, 'stickies' | 'arrows' | 'links' | 'cancels'> {
   const stickies = placed.flatMap((l) => l.stickies);
   const arrows = placed.flatMap((l) => l.arrows);
-  const pending = placed.flatMap((l) => l.pendingLinks);
   const events = new Map<string, Sticky>();
   for (const s of stickies) if (s.kind === 'event' && !events.has(s.text)) events.set(s.text, s);
+  // A board from parseAll may name an event that was on a broken line; such links are left out.
+  const pending = placed.flatMap((l) => l.pendingLinks).filter((l) => events.has(l.event));
   const bottoms: Bottoms = new Map();
   addBottoms(bottoms, stickies);
   const rails = clearOf(stickies);
