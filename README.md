@@ -82,6 +82,9 @@ dependencies, gaps and hotspots.
 A legend above the board names the sticky colours and arrow styles it uses,
 so exported images make sense to people who don't know the notation.
 
+To present a large board, drag it to pan, zoom with Ctrl/⌘ and the wheel or
+by pinching, and click a section's name to fit that section to the view.
+
 **Share** copies a link that opens the board for anyone. The board is
 compressed into the link's `#` fragment, which browsers never send to a
 server, so it is not uploaded anywhere. Links from the downloaded file

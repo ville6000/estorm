@@ -312,11 +312,18 @@ select:focus-visible {
 .preview-pane {
   overflow: auto;
   min-height: 0;
+  /* Dragging pans and pinching zooms the board (pan.ts), not the page. */
+  touch-action: none;
+  cursor: grab;
+}
+
+.preview-pane.panning {
+  cursor: grabbing;
 }
 
 .board {
   padding: 16px;
-  transform-origin: 0 0;
+  user-select: none;
 }
 
 .board.stale {
