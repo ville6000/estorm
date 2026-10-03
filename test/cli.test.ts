@@ -1,7 +1,8 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createServer } from 'node:net';
 import { afterAll, describe, expect, it } from 'vitest';
 
 const run = (...args: string[]) => spawnSync('node', ['src/cli.ts', ...args], { encoding: 'utf8' });
@@ -128,6 +129,28 @@ describe('cli', () => {
     const { status, stderr } = run('serve', 'examples/hotel.estorm', '-p', '70000');
     expect(status).toBe(2);
     expect(stderr).toContain('invalid port: 70000');
+  });
+
+  // An address of this machine that isn't loopback, if it has one.
+  const lanAddress = Object.values(networkInterfaces())
+    .flat()
+    .find((a) => a?.family === 'IPv4' && !a.internal)?.address;
+
+  it.skipIf(lanAddress === undefined)('serves the preview on loopback only', async () => {
+    const port = await new Promise<number>((resolve) => {
+      const s = createServer().listen(0, '127.0.0.1', () => {
+        const { port } = s.address() as { port: number };
+        s.close(() => resolve(port));
+      });
+    });
+    const child = spawn('node', ['src/cli.ts', 'serve', 'examples/hotel.estorm', '-p', String(port)]);
+    try {
+      await new Promise((resolve) => child.stderr.once('data', resolve));
+      expect((await fetch(`http://127.0.0.1:${port}/diagram.svg`)).status).toBe(200);
+      await expect(fetch(`http://${lanAddress}:${port}/`)).rejects.toThrow();
+    } finally {
+      child.kill();
+    }
   });
 
   it('explains usage errors', () => {
