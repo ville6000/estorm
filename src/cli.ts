@@ -213,7 +213,8 @@ function serve(files: string[], port: number, options: SvgOptions): Promise<numb
       console.error(e.message);
       resolve(1);
     });
-    server.listen(port, () => console.error(`Previewing ${file} at http://localhost:${port}`));
+    // Loopback only: the preview is for whoever is editing, not the network.
+    server.listen(port, '127.0.0.1', () => console.error(`Previewing ${file} at http://localhost:${port}`));
   });
 }
 
