@@ -48,10 +48,18 @@ describe('tokenize', () => {
     ]);
   });
 
-  it('ends a schedule at the first colon followed by a space', () => {
+  it('ends a schedule at the last colon', () => {
     expect(tokens('every night at 02:00: Clean up -> CleanedUp')).toEqual([
       ['keyword', 'every'],
       ['schedule', 'night at 02:00'],
+      ['punct', ':'],
+      ['command', 'Clean up'],
+      ['arrow', '->'],
+      ['event', 'CleanedUp'],
+    ]);
+    expect(tokens('every day:Clean up -> CleanedUp')).toEqual([
+      ['keyword', 'every'],
+      ['schedule', 'day'],
       ['punct', ':'],
       ['command', 'Clean up'],
       ['arrow', '->'],
