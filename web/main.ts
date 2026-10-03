@@ -85,9 +85,10 @@ function renderBoard(): void {
   board.classList.toggle('stale', errors.length > 0);
   summaryPanel.classList.toggle('stale', errors.length > 0);
   if (!errors.length) {
-    const l = boardLayout(ast);
-    board.innerHTML = svg(l, { theme: 'auto' });
-    state.size = { width: l.width, height: l.height };
+    board.innerHTML = svg(boardLayout(ast), { theme: 'auto' });
+    // The SVG's size, not the layout's: the legend can make it bigger.
+    const el = board.querySelector('svg')!;
+    state.size = { width: Number(el.getAttribute('width')), height: Number(el.getAttribute('height')) };
     applyZoom();
     state.summary = summarize(ast);
     summaryBody.innerHTML = summaryHtml(state.summary);

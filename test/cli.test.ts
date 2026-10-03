@@ -36,6 +36,12 @@ describe('cli', () => {
     expect(stdout).toContain('fill="#1a1b1e"');
   });
 
+  it('renders without the legend', () => {
+    const { status, stdout } = run('render', fixture('A: Do -> Done'), '--no-legend', '-o', '-');
+    expect(status).toBe(0);
+    expect(stdout).not.toContain('class="legend"');
+  });
+
   it('rejects unknown themes', () => {
     const { status, stderr } = run('render', fixture('A: Do -> Done'), '--theme', 'sepia');
     expect(status).toBe(2);
