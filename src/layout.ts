@@ -407,37 +407,41 @@ const RAIL_ROOM = 6;
  * and on until it is clear; failing that, right of the stickies instead.
  */
 function clearOf(stickies: Sticky[]): Clear {
-  const byY = [...stickies].sort((a, b) => a.y - b.y);
   const tallest = maxOf(
     stickies.map((s) => s.h),
     0,
   );
-  /** Stickies that overlap Y1..Y2 vertically. */
-  const within = (y1: number, y2: number): Sticky[] => {
+  const on = (x: number, s: Sticky) => x > s.x - RAIL_ROOM && x < s.x + s.w + RAIL_ROOM;
+  // Rails are tried at few distinct x, so the stickies at each are found once, top to bottom.
+  const columns = new Map<number, Sticky[]>();
+  const column = (x: number): Sticky[] => {
+    let c = columns.get(x);
+    if (!c) {
+      c = stickies.filter((s) => on(x, s)).sort((a, b) => a.y - b.y);
+      columns.set(x, c);
+    }
+    return c;
+  };
+  /** A sticky at X that overlaps Y1..Y2 vertically, if any. */
+  const blocker = (x: number, y1: number, y2: number): Sticky | undefined => {
+    const c = column(x);
     let lo = 0;
-    let hi = byY.length;
+    let hi = c.length;
     while (lo < hi) {
       const mid = (lo + hi) >> 1;
-      if (byY[mid]!.y < y1 - tallest) lo = mid + 1;
+      if (c[mid]!.y < y1 - tallest) lo = mid + 1;
       else hi = mid;
     }
-    const out: Sticky[] = [];
-    for (let i = lo; i < byY.length && byY[i]!.y < y2; i++) {
-      const s = byY[i]!;
-      if (s.y + s.h > y1) out.push(s);
-    }
-    return out;
+    for (let i = lo; i < c.length && c[i]!.y < y2; i++) if (c[i]!.y + c[i]!.h > y1) return c[i];
+    return undefined;
   };
-  const on = (x: number, s: Sticky) => x > s.x - RAIL_ROOM && x < s.x + s.w + RAIL_ROOM;
   return (x, y1, y2) => {
-    const near = within(y1, y2);
     for (const step of [-1, 1]) {
       let rail = x;
-      for (let i = 0; i <= near.length; i++) {
-        const s = near.find((s) => on(rail, s));
+      while (rail >= 0) {
+        const s = blocker(rail, y1, y2);
         if (!s) return rail;
         rail = step < 0 ? s.x - 0.5 * GAP_X : s.x + s.w + 0.5 * GAP_X;
-        if (rail < 0) break;
       }
     }
     return x;

@@ -36,8 +36,10 @@ function time(f: () => unknown): number {
 }
 
 // Budgets are generous, to catch quadratic slowdowns (minutes at this size)
-// without failing on a slow machine.
-describe('a board of about 100,000 lines', () => {
+// without failing on a slow machine. The timeout lets a test reach its budget.
+const BUDGET = 15_000;
+
+describe('a board of about 100,000 lines', { timeout: 2 * BUDGET }, () => {
   const text = bigBoard(10, 1000);
 
   it('goes through every step in seconds', () => {
@@ -51,7 +53,7 @@ describe('a board of about 100,000 lines', () => {
       lint(board);
       summarize(board);
     });
-    expect(ms).toBeLessThan(15_000);
+    expect(ms).toBeLessThan(BUDGET);
   });
 
   it('reports thousands of errors at once in seconds', () => {
@@ -63,7 +65,7 @@ describe('a board of about 100,000 lines', () => {
       diagnostics(broken);
     });
     expect(errors).toBe(10_000);
-    expect(ms).toBeLessThan(15_000);
+    expect(ms).toBeLessThan(BUDGET);
   });
 });
 
