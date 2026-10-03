@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { LANE_PAD, layout, SWIMLANE_GAP } from '../src/layout.ts';
 import type { Point, Sticky } from '../src/layout.ts';
-import { parse } from '../src/parser.ts';
+import { parse, parseAll } from '../src/parser.ts';
 
 const board = (...lines: string[]) => layout(parse(lines.join('\n')));
 
@@ -290,6 +290,23 @@ describe('across lanes', () => {
   it('keeps reactions in a lane under their event', () => {
     const { stickies } = lanes('A: Do -> Done', '  then B -> BDone');
     expect(find(stickies, 'whenever Done').x).toBe(find(stickies, 'Done').x);
+  });
+
+  it('lays out a board with errors, leaving out links to events on broken lines', () => {
+    const { board, errors } = parseAll(
+      [
+        'X: Do -> OrderPlaced -> Paid (',
+        'when OrderPlaced',
+        '  then A -> B',
+        '  after 5 minutes unless Paid',
+        '    then C -> D',
+      ].join('\n'),
+    );
+    expect(errors.map((e) => e.line)).toEqual([1]);
+    const l = layout(board);
+    expect(l.links).toEqual([]);
+    expect(l.cancels).toEqual([]);
+    expect(find(l.stickies, 'B')).toBeDefined();
   });
 
   it.each(readdirSync('examples').filter((f) => f.endsWith('.estorm')))(
