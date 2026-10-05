@@ -132,6 +132,11 @@ Errors are reported as `file:line: message`, and the exit code is non-zero.
 used in more than one bounded context; see
 [GRAMMAR.md](GRAMMAR.md#warnings).
 
+`serve` redraws the board each time you save the file in your editor. The
+page has the browser editor's board without the editor: pan and zoom, fit a
+section, the timeline view, the summary with lint warnings, and SVG or PNG
+export.
+
 To pin a version per project, use `npm install -D @villev/estorm` and run
 `npx estorm`. Running `npx @villev/estorm` without installing also works,
 but downloads the package and so needs a connection.

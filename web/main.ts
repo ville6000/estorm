@@ -4,8 +4,8 @@
  *
  * This file holds the app's state and wires the page to it; the parts live in
  * codemirror.ts (the source editor), files.ts (open, save, export), html.ts
- * (panel contents), pan.ts (pan and zoom gestures), prefs.ts (local storage),
- * share.ts (links) and zoom.ts.
+ * (panel contents), viewport.ts (the board's pane: zoom, fit, pan.ts gestures),
+ * prefs.ts (local storage) and share.ts (links).
  */
 import { EditorView } from '@codemirror/view';
 import {
@@ -22,11 +22,11 @@ import {
 } from '../src/index.ts';
 import { createState, goToLine, setErrorLines, setVimKeys, Vim } from './codemirror.ts';
 import { canPick, download, type FileHandle, pickFile, pickSaveFile, svgToPng, writeTo } from './files.ts';
+import { copies } from './copy.ts';
 import { errorsHtml, summaryHtml, warningsHtml } from './html.ts';
 import * as prefs from './prefs.ts';
 import { decode, encode } from './share.ts';
-import { type BoardView, panAndZoom } from './pan.ts';
-import { boardAt, clampZoom, scrollFor, zoomStep, zoomToFit, zoomToFitArea } from './zoom.ts';
+import { viewport } from './viewport.ts';
 
 // Where links from the downloaded file point, since file:// links don't work for others.
 const PUBLIC_URL = 'https://ville6000.github.io/estorm/';
@@ -39,9 +39,6 @@ const examples = Object.fromEntries(
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const board = $<HTMLDivElement>('board');
-const pane = board.parentElement!;
-/** The board's padding, unscaled, around the SVG. */
-const BOARD_PAD = 16;
 const errorList = $<HTMLDivElement>('errors');
 const fileName = $<HTMLSpanElement>('file-name');
 const fileInput = $<HTMLInputElement>('file-input');
@@ -61,14 +58,13 @@ const state = {
   name: 'untitled.estorm',
   handle: null as FileHandle | null,
   saved: '',
-  zoom: 1,
-  size: { width: 0, height: 0 },
   vim: prefs.loadVim(),
   timeline: prefs.loadTimeline(),
   summary: '',
 };
 
 const view = new EditorView({ parent: $('source') });
+const boardView = viewport(board.parentElement!, board, zoomReset);
 
 function sourceText(): string {
   return view.state.doc.toString();
@@ -90,11 +86,7 @@ function renderBoard(): void {
   board.classList.toggle('stale', errors.length > 0);
   summaryPanel.classList.toggle('stale', errors.length > 0);
   if (!errors.length) {
-    board.innerHTML = svg(boardLayout(ast), { theme: 'auto' });
-    // The SVG's size, not the layout's: the legend can make it bigger.
-    const el = board.querySelector('svg')!;
-    state.size = { width: Number(el.getAttribute('width')), height: Number(el.getAttribute('height')) };
-    applyZoom();
+    boardView.show(svg(boardLayout(ast), { theme: 'auto' }));
     state.summary = summarize(ast);
     summaryBody.innerHTML = summaryHtml(state.summary);
     const warnings = lint(ast);
@@ -111,76 +103,6 @@ let pending = 0;
 function scheduleRender(): void {
   clearTimeout(pending);
   pending = window.setTimeout(renderBoard, 120);
-}
-
-function applyZoom(): void {
-  const el = board.querySelector('svg');
-  if (el) {
-    el.style.width = `${state.size.width * state.zoom}px`;
-    el.style.height = `${state.size.height * state.zoom}px`;
-  }
-  zoomReset.textContent = `${Math.round(state.zoom * 100)}%`;
-}
-
-/** The board in the pane, for pan and zoom gestures. */
-const boardView: BoardView = {
-  zoom: () => state.zoom,
-  boardAt(x, y) {
-    const r = pane.getBoundingClientRect();
-    return {
-      x: boardAt(pane.scrollLeft, x - r.left, state.zoom, BOARD_PAD),
-      y: boardAt(pane.scrollTop, y - r.top, state.zoom, BOARD_PAD),
-    };
-  },
-  place(zoom, board, x, y) {
-    const r = pane.getBoundingClientRect();
-    state.zoom = clampZoom(zoom);
-    applyZoom();
-    pane.scrollLeft = scrollFor(board.x, x - r.left, state.zoom, BOARD_PAD);
-    pane.scrollTop = scrollFor(board.y, y - r.top, state.zoom, BOARD_PAD);
-  },
-};
-
-/** Zooms to ZOOM keeping the board point in the middle of the pane in place. */
-function setZoom(zoom: number): void {
-  const r = pane.getBoundingClientRect();
-  const x = r.left + 0.5 * pane.clientWidth;
-  const y = r.top + 0.5 * pane.clientHeight;
-  boardView.place(zoom, boardView.boardAt(x, y), x, y);
-}
-
-/** Zooms to ZOOM with the board point X, Y (in board pixels) at the top left. */
-function showAt(zoom: number, x: number, y: number): void {
-  state.zoom = clampZoom(zoom);
-  applyZoom();
-  pane.scrollLeft = x * state.zoom;
-  pane.scrollTop = y * state.zoom;
-}
-
-function fitBoard(): void {
-  if (state.size.width) showAt(zoomToFit(pane.clientWidth - 2 * BOARD_PAD, state.size.width), 0, 0);
-}
-
-/** Fits the lane whose label is LABEL into the pane. */
-function fitLane(label: Element): void {
-  const svgEl = board.querySelector('svg')!;
-  const at = label.getBoundingClientRect();
-  const panel = [...svgEl.querySelectorAll('rect.background')]
-    .map((p) => p.getBoundingClientRect())
-    .find((p) => p.left <= at.left && at.right <= p.right && p.top <= at.top && at.bottom <= p.bottom);
-  if (!panel) return;
-  const origin = svgEl.getBoundingClientRect();
-  const z = state.zoom;
-  showAt(
-    zoomToFitArea(
-      pane.clientWidth - 2 * BOARD_PAD,
-      pane.clientHeight - 2 * BOARD_PAD,
-      panel.width / z,
-      panel.height / z,
-    ),
-    (panel.left - origin.left) / z,
-    (panel.top - origin.top) / z,
-  );
 }
 
 // --- files -------------------------------------------------------------------
@@ -259,7 +181,7 @@ async function openShared(): Promise<void> {
   window.history.replaceState(null, '', location.pathname + location.search);
   if (shared.text !== sourceText() && !confirmDiscard()) return;
   load(shared.text, shared.name, null, '');
-  fitBoard();
+  boardView.fit();
 }
 
 async function shareLink(): Promise<string> {
@@ -276,26 +198,6 @@ function jumpsToLines(el: HTMLElement): void {
   el.addEventListener('click', (e) => {
     const target = (e.target as Element).closest('[data-line]');
     if (target) goToLine(view, Number(target.getAttribute('data-line')));
-  });
-}
-
-/** Shows TEXT on BUTTON for a moment, then its label again. */
-function flash(button: HTMLButtonElement, text: string): void {
-  const label = button.dataset.label ?? (button.dataset.label = button.textContent ?? '');
-  button.textContent = text;
-  setTimeout(() => (button.textContent = label), 1500);
-}
-
-/** Clicking button ID copies the text from GET, saying DONE when copied. */
-function copies(id: string, get: () => string | Promise<string>, done: string): void {
-  const button = $<HTMLButtonElement>(id);
-  button.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(await get());
-      flash(button, done);
-    } catch {
-      flash(button, 'Copy failed');
-    }
   });
 }
 
@@ -325,11 +227,6 @@ function setTimeline(timeline: boolean): void {
 }
 
 jumpsToLines(board);
-board.addEventListener('click', (e) => {
-  const label = (e.target as Element).closest('.lane');
-  if (label) fitLane(label);
-});
-panAndZoom(pane, boardView);
 jumpsToLines(warningList);
 jumpsToLines(errorList);
 
@@ -337,14 +234,14 @@ on('new', () => confirmDiscard() && load('', 'untitled.estorm', null));
 on('open', open);
 on('save', save);
 on('save-as', saveAs);
-on('zoom-in', () => setZoom(zoomStep(state.zoom, 1)));
-on('zoom-out', () => setZoom(zoomStep(state.zoom, -1)));
-on('zoom-reset', () => setZoom(1));
-on('zoom-fit', fitBoard);
+on('zoom-in', () => boardView.step(1));
+on('zoom-out', () => boardView.step(-1));
+on('zoom-reset', () => boardView.setZoom(1));
+on('zoom-fit', boardView.fit);
 on('timeline', () => {
   setTimeline(!state.timeline);
   renderBoard();
-  fitBoard();
+  boardView.fit();
 });
 on('vim', () => {
   setVim(!state.vim);
@@ -352,8 +249,8 @@ on('vim', () => {
 });
 on('help', () => togglePanel(cheatsheet));
 on('summary-toggle', () => togglePanel(summaryPanel));
-copies('share', shareLink, 'Link copied');
-copies('copy-summary', () => state.summary, 'Copied');
+copies($('share'), shareLink, 'Link copied');
+copies($('copy-summary'), () => state.summary, 'Copied');
 
 exportPicker.addEventListener('change', () => {
   const format = exportPicker.value;
@@ -414,6 +311,6 @@ if (draft) {
   load(draft.text, draft.name, null, '');
 } else {
   load(examples['checkout.estorm'] ?? '', 'checkout.estorm', null);
-  fitBoard();
+  boardView.fit();
 }
 void openShared();

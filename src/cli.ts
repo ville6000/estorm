@@ -5,6 +5,8 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { lint, parse, parseAll, ParseError, render, renderTimeline, summarize } from './index.ts';
 import type { SvgOptions, Theme } from './index.ts';
@@ -40,15 +42,21 @@ const READ_ERRORS: Record<string, string> = {
   EACCES: 'permission denied',
 };
 
-/** FILE through CONVERT (SVG by default), or its errors as "file:line: message" lines. */
-function compile(file: string, convert: (text: string) => string = render): Result {
-  let text: string;
+/** FILE's text, or why it can't be read. */
+function readText(file: string): { text: string } | { error: string } {
   try {
-    text = readFileSync(file, 'utf8');
+    return { text: readFileSync(file, 'utf8') };
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
     return { error: `${file}: ${READ_ERRORS[code ?? ''] ?? 'cannot read file'}` };
   }
+}
+
+/** FILE through CONVERT (SVG by default), or its errors as "file:line: message" lines. */
+function compile(file: string, convert: (text: string) => string = render): Result {
+  const source = readText(file);
+  if ('error' in source) return source;
+  const { text } = source;
   try {
     return { out: convert(text) };
   } catch (e) {
@@ -138,59 +146,14 @@ function summary(files: string[]): number {
   return failed ? 1 : 0;
 }
 
-const PREVIEW = (file: string) => `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>estorm · ${file.replace(/[<>&"]/g, '')}</title>
-<style>
-  :root { color-scheme: light dark; }
-  body { margin: 0; font-family: system-ui, sans-serif; background: #f1f3f5; }
-  #error { display: none; position: sticky; top: 0; margin: 0; padding: 10px 16px;
-           background: #ffe3e3; color: #c92a2a; white-space: pre-wrap; }
-  #error.show { display: block; }
-  #diagram { padding: 16px; }
-  #diagram.stale { opacity: 0.4; }
-  @media (prefers-color-scheme: dark) {
-    body { background: #101113; }
-    #error { background: #3b1f22; color: #ffa8a8; }
-  }
-</style>
-</head>
-<body>
-<pre id="error"></pre>
-<div id="diagram"></div>
-<script>
-  // Polls the server; swaps in the new SVG when it changes, shows parse
-  // errors on top of the last good diagram.
-  const error = document.getElementById('error');
-  const diagram = document.getElementById('diagram');
-  let last = null;
+// The page serve shows, built from web/preview.html. From src/ (while
+// developing) and from dist/ alike, it's in ../dist/web.
+const PREVIEW_PAGE = new URL('../dist/web/preview.html', import.meta.url);
 
-  async function refresh() {
-    try {
-      const res = await fetch('/diagram.svg', { cache: 'no-store' });
-      const body = await res.text();
-      if (res.ok) {
-        error.classList.remove('show');
-        diagram.classList.remove('stale');
-        if (body !== last) { diagram.innerHTML = body; last = body; }
-      } else {
-        error.textContent = body;
-        error.classList.add('show');
-        diagram.classList.add('stale');
-      }
-    } catch (e) {
-      // server stopped; keep showing the last diagram
-    }
-    setTimeout(refresh, 1000);
-  }
-  refresh();
-</script>
-</body>
-</html>`;
-
-/** Serves a live preview of FILE; the page re-renders it every second. */
+/**
+ * Serves a live preview of FILE: a page that fetches the file's text from
+ * /board every second and draws it, so it follows edits in any editor.
+ */
 function serve(files: string[], port: number, options: SvgOptions): Promise<number> {
   const [file] = files;
   if (files.length !== 1 || file === undefined) throw new UsageError('serve needs exactly one file');
@@ -198,13 +161,21 @@ function serve(files: string[], port: number, options: SvgOptions): Promise<numb
     // Routes on the path alone: bookmarks and extensions may add a query.
     const path = new URL(req.url ?? '/', 'http://localhost').pathname;
     if (path === '/') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(PREVIEW(file));
-    } else if (path === '/diagram.svg') {
-      const result = compile(file, (text) => render(text, options));
-      if ('error' in result) {
-        res.writeHead(422, { 'Content-Type': 'text/plain; charset=utf-8' }).end(result.error);
+      const page = readText(fileURLToPath(PREVIEW_PAGE));
+      if ('error' in page) {
+        res
+          .writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' })
+          .end('Preview page not built: run npm run build');
       } else {
-        res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8' }).end(result.out);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(page.text);
+      }
+    } else if (path === '/board') {
+      const board = readText(file);
+      if ('error' in board) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end(board.error);
+      } else {
+        const body = { name: basename(file), text: board.text, theme: options.theme, legend: options.legend };
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }).end(JSON.stringify(body));
       }
     } else {
       res.writeHead(404).end('not found');
