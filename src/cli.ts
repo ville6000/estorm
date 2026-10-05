@@ -195,9 +195,11 @@ function serve(files: string[], port: number, options: SvgOptions): Promise<numb
   const [file] = files;
   if (files.length !== 1 || file === undefined) throw new UsageError('serve needs exactly one file');
   const server = createServer((req, res) => {
-    if (req.url === '/') {
+    // Routes on the path alone: bookmarks and extensions may add a query.
+    const path = new URL(req.url ?? '/', 'http://localhost').pathname;
+    if (path === '/') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(PREVIEW(file));
-    } else if (req.url === '/diagram.svg') {
+    } else if (path === '/diagram.svg') {
       const result = compile(file, (text) => render(text, options));
       if ('error' in result) {
         res.writeHead(422, { 'Content-Type': 'text/plain; charset=utf-8' }).end(result.error);
