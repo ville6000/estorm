@@ -387,6 +387,13 @@ describe('parseAll', () => {
     expect(errorsOf('A: Do -> [Ext -> Done', 'when Done', '  then B -> BDone')).toEqual([[1, 'invalid item: [Ext']]);
   });
 
+  it('reports an unknown event that a broken line only contains part of', () => {
+    expect(errorsOf('X: Do -> (A -> OrderPlacedLate', 'when Order', '  then A -> B')).toEqual([
+      [1, 'invalid item: (A'],
+      [2, "'when' refers to unknown event Order"],
+    ]);
+  });
+
   it('reports each read model that informs nothing, and parses on', () => {
     const { board, errors } = parseAll(lines('{R1}', '{R2}', '== S ==', '{R3}'));
     expect(errors.map((e) => [e.line, e.message])).toEqual([
