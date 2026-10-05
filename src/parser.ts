@@ -379,11 +379,13 @@ function* allSteps(trees: Node[]): Generator<Node> {
 /**
  * Each 'when' and 'after' needs reactions, and the events they name must
  * exist. An event named on a BROKEN line may exist, so it isn't reported.
+ * Names can't hold arrows, brackets or colons, so the line is split on them.
  */
 function checkTriggers(trees: Node[], broken: string[]): ParseError[] {
   const errors: ParseError[] = [];
+  const maybe = new Set(broken.flatMap((raw) => raw.split(/->|[()[\]{}:]/).map((x) => x.trim())));
   const unknown = (line: number, keyword: string, event: string) => {
-    if (!broken.some((raw) => raw.includes(event))) {
+    if (!maybe.has(event)) {
       errors.push(new ParseError(line, `'${keyword}' refers to unknown event ${event}`));
     }
   };
