@@ -155,15 +155,27 @@ describe('cli', () => {
 
   it.skipIf(lanAddress === undefined)('serves the preview on loopback only', () =>
     serving(async (port) => {
-      expect((await fetch(`http://127.0.0.1:${port}/diagram.svg`)).status).toBe(200);
+      expect((await fetch(`http://127.0.0.1:${port}/board`)).status).toBe(200);
       await expect(fetch(`http://${lanAddress}:${port}/`)).rejects.toThrow();
     }),
   );
 
+  it('serves the file and the options for the preview page to draw', () =>
+    serving(async (port) => {
+      const res = await fetch(`http://127.0.0.1:${port}/board`);
+      expect(await res.json()).toEqual({
+        name: 'hotel.estorm',
+        text: readFileSync('examples/hotel.estorm', 'utf8'),
+        theme: 'auto',
+        legend: true,
+      });
+    }));
+
   it('ignores the query string when serving', () =>
     serving(async (port) => {
-      expect((await fetch(`http://127.0.0.1:${port}/?from=bookmark`)).status).toBe(200);
-      expect((await fetch(`http://127.0.0.1:${port}/diagram.svg?t=1`)).status).toBe(200);
+      // The page itself is built by npm run build, which tests don't need.
+      expect((await fetch(`http://127.0.0.1:${port}/?from=bookmark`)).status).not.toBe(404);
+      expect((await fetch(`http://127.0.0.1:${port}/board?t=1`)).status).toBe(200);
       expect((await fetch(`http://127.0.0.1:${port}/nope?x`)).status).toBe(404);
     }));
 

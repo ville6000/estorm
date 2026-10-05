@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>estorm</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <strong class="brand">estorm</strong>
+      <span id="file-name" class="file-name"></span>
+      <div class="group" role="group" aria-label="File">
+        <select id="export" title="Download the board as an image">
+          <option value="">Export…</option>
+          <option value="svg">SVG</option>
+          <option value="png">PNG</option>
+        </select>
+      </div>
+      <div class="group board-group" role="group" aria-label="Board">
+        <button
+          id="timeline"
+          type="button"
+          aria-pressed="false"
+          title="Show only events, sections as swimlanes, on one timeline"
+        >
+          Timeline
+        </button>
+        <button
+          id="summary-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="summary"
+          title="Warnings, actors, aggregates, context dependencies, gaps and hotspots"
+        >
+          Summary
+        </button>
+        <div class="zoom" role="group" aria-label="Zoom">
+          <button id="zoom-out" type="button" title="Zoom out">−</button>
+          <button id="zoom-reset" type="button" title="Reset zoom">100%</button>
+          <button id="zoom-in" type="button" title="Zoom in">+</button>
+          <button id="zoom-fit" type="button" title="Fit to width">Fit</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="workspace viewer">
+      <div id="errors" class="errors" role="alert" hidden></div>
+
+      <section class="preview-pane" aria-label="Board">
+        <div id="board" class="board"></div>
+      </section>
+
+      <aside id="summary" class="panel summary" hidden>
+        <div class="panel-header">
+          <h2>Summary</h2>
+          <button id="copy-summary" type="button" title="Copy the summary as Markdown">Copy Markdown</button>
+        </div>
+        <div id="warnings"></div>
+        <div id="summary-body"></div>
+      </aside>
+    </main>
+
+    <script type="module" src="./preview.ts"></script>
+  </body>
+</html>

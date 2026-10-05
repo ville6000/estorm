@@ -121,6 +121,10 @@ select:focus-visible {
   content: ' •';
 }
 
+.file-name.stopped::after {
+  content: ' (preview stopped)';
+}
+
 .group,
 .zoom {
   display: flex;
@@ -307,6 +311,37 @@ select:focus-visible {
 
 .errors button:hover {
   text-decoration: underline;
+}
+
+/* The live preview (preview.html): the board alone, errors above it. Nothing
+   jumps to lines there, as there's no editor. */
+.workspace.viewer {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+}
+
+.viewer .errors {
+  max-height: 30vh;
+  padding: 8px 0;
+  border-top: 0;
+  border-bottom: 1px solid var(--error-border);
+}
+
+.viewer .errors p {
+  margin: 0;
+  padding: 2px 16px;
+  color: var(--error);
+  font-family: var(--mono);
+  white-space: pre-wrap;
+}
+
+.viewer .board svg g[data-line] {
+  cursor: inherit;
+}
+
+.viewer #warnings button {
+  cursor: text;
+  text-decoration: none;
 }
 
 .preview-pane {

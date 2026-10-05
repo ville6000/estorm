@@ -29,13 +29,14 @@ estorm is a small pipeline. Each step is a pure function in its own file:
 | `src/highlight.ts` | one line to tokens, for the editor and the language server                                           |
 | `src/lsp.ts`       | `estorm lsp`: language server over stdio                                                             |
 | `src/cli.ts`       | `estorm render / check / lint / summary / serve / lsp`                                               |
-| `web/`             | the browser editor, built into one file, `estorm.html`                                               |
+| `web/`             | the browser editor, built into one file, `estorm.html`, and the `serve` page, `preview.html`         |
 | `examples/`        | example boards and their rendered SVGs                                                               |
 
 The source runs directly on Node.js (type stripping), so there is no build
 step while developing: `npm run estorm -- render board.estorm`. Keep to
 syntax that can be stripped: no enums, namespaces or parameter properties
-(the `erasableSyntaxOnly` option enforces this).
+(the `erasableSyntaxOnly` option enforces this). The one exception is
+`estorm serve`: its page is built from `web/`, so run `npm run build` first.
 
 The CLI and the library have no runtime dependencies, and the editor makes
 no network requests. Keep it that way: teams use estorm in offline
