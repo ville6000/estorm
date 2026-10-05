@@ -44,6 +44,16 @@ describe('svg', () => {
     expect(doc.match(/class="background"/g)).toHaveLength(3); // the legend's, and one per lane
   });
 
+  it('gives each board its own marker and filter ids', () => {
+    const ids = (doc: string) => [...doc.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]);
+    const light = render('A: Do -> Done');
+    const dark = render('A: Do -> Done', { theme: 'dark' });
+    expect(ids(light)).toHaveLength(3);
+    expect(ids(light).filter((id) => ids(dark).includes(id))).toEqual([]);
+    for (const [, id] of light.matchAll(/url\(#([^)]+)\)/g)) expect(ids(light)).toContain(id);
+    expect(render('A: Do -> Done')).toBe(light);
+  });
+
   it('lists rules inside their aggregate', () => {
     const doc = render('A: Do -> (Order) -> Done\n  * Total & tax > 0');
     expect(doc).toContain('class="rule"');
