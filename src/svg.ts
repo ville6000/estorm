@@ -94,7 +94,7 @@ const PALETTES: Record<'light' | 'dark', Palette> = {
 const STICKY_TEXT = '#212529';
 
 /** Dark overrides for theme 'auto', scoped to .estorm so an inlined SVG leaves the page alone. */
-function darkStyle(p: Palette): string {
+function darkStyle(p: Palette, id: string): string {
   return el(
     'style',
     {},
@@ -105,8 +105,8 @@ function darkStyle(p: Palette): string {
       ` .estorm .arrow { stroke: ${p.arrow} }` +
       ` .estorm .link { stroke: ${p.link} }` +
       ` .estorm .cancel { stroke: ${p.cancel} }` +
-      ` .estorm #arrow path { fill: ${p.arrow} }` +
-      ` .estorm #cancel path { fill: ${p.cancel} }` +
+      ` .estorm #${id}-arrow path { fill: ${p.arrow} }` +
+      ` .estorm #${id}-cancel path { fill: ${p.cancel} }` +
       ' }',
   );
 }
@@ -126,7 +126,7 @@ function el(tag: string, attrs: Attrs, children: string | string[] = []): string
   return body === '' ? `<${tag}${a}/>` : `<${tag}${a}>${body}</${tag}>`;
 }
 
-function sticky(s: Sticky): string {
+function sticky(s: Sticky, id: string): string {
   const { kind, text, line, x, y, w, h } = s;
   const cx = x + 0.5 * w;
   const cy = y + 0.5 * h;
@@ -138,7 +138,7 @@ function sticky(s: Sticky): string {
       transform: kind === 'hotspot' ? `rotate(-3 ${cx} ${cy})` : undefined,
     },
     [
-      el('rect', { x, y, width: w, height: h, fill: COLORS[kind], filter: 'url(#shadow)' }),
+      el('rect', { x, y, width: w, height: h, fill: COLORS[kind], filter: `url(#${id}-shadow)` }),
       ...(s.rules?.length ? ruledText(s) : [centredText(s)]),
     ],
   );
@@ -202,19 +202,19 @@ function pathD(points: Path): string {
   return 'M' + points.map(([x, y]) => `${x} ${y}`).join(' L');
 }
 
-function arrow(points: Path, p: Palette): string {
+function arrow(points: Path, p: Palette, id: string): string {
   return el('path', {
     class: 'arrow',
     d: pathD(points),
     fill: 'none',
     stroke: p.arrow,
     'stroke-width': 1.5,
-    'marker-end': 'url(#arrow)',
+    'marker-end': `url(#${id}-arrow)`,
   });
 }
 
 /** Arrow of a 'when' reaction, dashed: it may cross a lane boundary. */
-function link(points: Path, p: Palette): string {
+function link(points: Path, p: Palette, id: string): string {
   return el('path', {
     class: 'link',
     d: pathD(points),
@@ -222,12 +222,12 @@ function link(points: Path, p: Palette): string {
     stroke: p.link,
     'stroke-width': 1.5,
     'stroke-dasharray': '6 4',
-    'marker-end': 'url(#arrow)',
+    'marker-end': `url(#${id}-arrow)`,
   });
 }
 
 /** Arrow from the 'unless' event of an 'after' into the delayed policy: dotted red, it cancels the timer. */
-function cancel(points: Path, p: Palette): string {
+function cancel(points: Path, p: Palette, id: string): string {
   return el('path', {
     class: 'cancel',
     d: pathD(points),
@@ -235,7 +235,7 @@ function cancel(points: Path, p: Palette): string {
     stroke: p.cancel,
     'stroke-width': 1.5,
     'stroke-dasharray': '2 3',
-    'marker-end': 'url(#cancel)',
+    'marker-end': `url(#${id}-cancel)`,
   });
 }
 
@@ -265,11 +265,11 @@ function marker(id: string, color: string): string {
   );
 }
 
-function defs(p: Palette): string {
+function defs(p: Palette, id: string): string {
   return el('defs', {}, [
-    marker('arrow', p.arrow),
-    marker('cancel', p.cancel),
-    el('filter', { id: 'shadow', x: '-10%', y: '-10%', width: '130%', height: '130%' }, [
+    marker(`${id}-arrow`, p.arrow),
+    marker(`${id}-cancel`, p.cancel),
+    el('filter', { id: `${id}-shadow`, x: '-10%', y: '-10%', width: '130%', height: '130%' }, [
       el('feDropShadow', { dx: 2, dy: 3, stdDeviation: 2, 'flood-opacity': 0.2 }),
     ]),
   ]);
@@ -283,17 +283,18 @@ interface LegendItem {
 }
 
 /** Legend items for the sticky kinds and arrow styles in LAYOUT, and none for what it lacks. */
-function legendItems({ stickies, arrows, links, cancels }: Layout, p: Palette): LegendItem[] {
+function legendItems({ stickies, arrows, links, cancels }: Layout, p: Palette, id: string): LegendItem[] {
   const kinds = new Set(stickies.map((s) => s.kind));
   const swatch = (kind: Kind) => (x: number, y: number) =>
     el('rect', { x, y: y - 0.5 * SWATCH, width: SWATCH, height: SWATCH, fill: COLORS[kind] });
-  const line = (draw: (points: Path, p: Palette) => string) => (x: number, y: number) =>
+  const line = (draw: (points: Path, p: Palette, id: string) => string) => (x: number, y: number) =>
     draw(
       [
         [x, y],
         [x + LINE_SAMPLE, y],
       ],
       p,
+      id,
     );
   return [
     ...KIND_NAMES.filter(([kind]) => kinds.has(kind)).map(([kind, name]) => ({
@@ -312,8 +313,8 @@ function legendItems({ stickies, arrows, links, cancels }: Layout, p: Palette): 
  * into rows, on a box of the background colour only as wide as they need.
  * It may be wider than the board on narrow boards.
  */
-function legend(layout: Layout, p: Palette): { body: string; width: number; height: number } {
-  const items = legendItems(layout, p);
+function legend(layout: Layout, p: Palette, id: string): { body: string; width: number; height: number } {
+  const items = legendItems(layout, p, id);
   if (!items.length) return { body: '', width: 0, height: 0 };
   const right = Math.max(layout.width, LEGEND_MIN_W) - LEGEND_PAD_X;
   const out: string[] = [];
@@ -350,11 +351,23 @@ function legend(layout: Layout, p: Palette): { body: string; width: number; heig
   };
 }
 
-/** Layout into a standalone SVG document string, light unless OPTIONS say otherwise. */
+/** FNV-1a hash of S, in base 36. */
+function hash(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(36);
+}
+
+/**
+ * Layout into a standalone SVG document string, light unless OPTIONS say otherwise.
+ * Its marker and filter ids come from what it draws, so boards inlined on one
+ * page don't clash; only identical boards share them, harmlessly.
+ */
 export function svg(layout: Layout, { theme = 'light', legend: withLegend = true }: SvgOptions = {}): string {
   const { stickies, arrows, links, cancels, lanes, panels } = layout;
   const p = PALETTES[theme === 'dark' ? 'dark' : 'light'];
-  const key = withLegend ? legend(layout, p) : { body: '', width: 0, height: 0 };
+  const id = `estorm-${hash(JSON.stringify([layout, theme, withLegend]))}`;
+  const key = withLegend ? legend(layout, p, id) : { body: '', width: 0, height: 0 };
   const width = Math.max(layout.width, key.width);
   const height = layout.height + key.height;
   return el(
@@ -368,8 +381,8 @@ export function svg(layout: Layout, { theme = 'light', legend: withLegend = true
       'font-family': 'system-ui, -apple-system, sans-serif',
     },
     [
-      ...(theme === 'auto' ? [darkStyle(PALETTES.dark)] : []),
-      defs(p),
+      ...(theme === 'auto' ? [darkStyle(PALETTES.dark, id)] : []),
+      defs(p, id),
       key.body,
       // The board moves down to make room for the legend.
       el('g', { transform: key.height ? `translate(0 ${key.height})` : undefined }, [
@@ -377,10 +390,10 @@ export function svg(layout: Layout, { theme = 'light', legend: withLegend = true
           el('rect', { class: 'background', x, y, width: w, height: h, fill: p.background }),
         ),
         ...lanes.map((l) => lane(l, p)),
-        ...arrows.map((a) => arrow(a, p)),
-        ...links.map((l) => link(l, p)),
-        ...cancels.map((c) => cancel(c, p)),
-        ...stickies.map(sticky),
+        ...arrows.map((a) => arrow(a, p, id)),
+        ...links.map((l) => link(l, p, id)),
+        ...cancels.map((c) => cancel(c, p, id)),
+        ...stickies.map((s) => sticky(s, id)),
       ]),
     ],
   );
