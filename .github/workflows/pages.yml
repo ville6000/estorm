@@ -30,7 +30,8 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      # No dependency needs its install scripts; skipping them keeps them away from the job's token.
+      - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run build
       - name: Prepare site
