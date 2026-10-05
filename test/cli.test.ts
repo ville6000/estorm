@@ -136,7 +136,8 @@ describe('cli', () => {
     .flat()
     .find((a) => a?.family === 'IPv4' && !a.internal)?.address;
 
-  it.skipIf(lanAddress === undefined)('serves the preview on loopback only', async () => {
+  /** Runs F against `estorm serve` on a free port, stopping the server after. */
+  async function serving(f: (port: number) => Promise<void>): Promise<void> {
     const port = await new Promise<number>((resolve) => {
       const s = createServer().listen(0, '127.0.0.1', () => {
         const { port } = s.address() as { port: number };
@@ -146,12 +147,25 @@ describe('cli', () => {
     const child = spawn('node', ['src/cli.ts', 'serve', 'examples/hotel.estorm', '-p', String(port)]);
     try {
       await new Promise((resolve) => child.stderr.once('data', resolve));
-      expect((await fetch(`http://127.0.0.1:${port}/diagram.svg`)).status).toBe(200);
-      await expect(fetch(`http://${lanAddress}:${port}/`)).rejects.toThrow();
+      await f(port);
     } finally {
       child.kill();
     }
-  });
+  }
+
+  it.skipIf(lanAddress === undefined)('serves the preview on loopback only', () =>
+    serving(async (port) => {
+      expect((await fetch(`http://127.0.0.1:${port}/diagram.svg`)).status).toBe(200);
+      await expect(fetch(`http://${lanAddress}:${port}/`)).rejects.toThrow();
+    }),
+  );
+
+  it('ignores the query string when serving', () =>
+    serving(async (port) => {
+      expect((await fetch(`http://127.0.0.1:${port}/?from=bookmark`)).status).toBe(200);
+      expect((await fetch(`http://127.0.0.1:${port}/diagram.svg?t=1`)).status).toBe(200);
+      expect((await fetch(`http://127.0.0.1:${port}/nope?x`)).status).toBe(404);
+    }));
 
   it('explains usage errors', () => {
     const { status, stderr } = run('frobnicate');
