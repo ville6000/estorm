@@ -35,6 +35,15 @@ describe('tokenize', () => {
     ]);
   });
 
+  it('marks each event of a when on several', () => {
+    expect(tokens('when Paid, Shipped')).toEqual([
+      ['keyword', 'when'],
+      ['event', 'Paid'],
+      ['punct', ','],
+      ['event', 'Shipped'],
+    ]);
+  });
+
   it('splits after into duration and optional unless event', () => {
     expect(tokens('  after 30 days unless Paid')).toEqual([
       ['keyword', 'after'],

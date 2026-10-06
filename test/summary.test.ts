@@ -24,6 +24,20 @@ describe('summarize', () => {
     );
   });
 
+  it('counts each event of a when on several as a dependency', () => {
+    const text = [
+      '== Sales ==',
+      'A: Do -> Placed',
+      'B: Go -> Cancelled',
+      '== Billing ==',
+      'when Placed, Cancelled',
+      '  then Bill -> Billed',
+    ];
+    const out = summary(text.join('\n'));
+    expect(out).toContain('- Sales → Billing: Placed, Cancelled\n');
+    expect(out).not.toMatch(/- (Placed|Cancelled)\n/); // each is reacted to
+  });
+
   it('groups commands by actor, aggregate and external system', () => {
     const text = [
       'Member: Borrow -> (Loan) -> (Copy) -> Borrowed',

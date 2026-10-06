@@ -53,7 +53,13 @@ export function tokenize(line: string): Token[] {
     chain(start + 5);
   } else if (word('when')) {
     add('keyword', start, start + 4);
-    add('event', start + 5, line.length);
+    let at = start + 5;
+    for (const comma of [...line.slice(at).matchAll(/,/g)].map((m) => at + m.index)) {
+      add('event', at, comma);
+      add('punct', comma, comma + 1);
+      at = comma + 1;
+    }
+    add('event', at, line.length);
   } else if (word('after')) {
     add('keyword', start, start + 5);
     const unless = line.indexOf(' unless ', start + 5);

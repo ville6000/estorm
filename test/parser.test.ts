@@ -192,7 +192,7 @@ describe('parse', () => {
     it('gives a when its reactions; read models above it inform them', () => {
       const when = ast[4] as When;
       const r = when.reactions[0] as Reaction;
-      expect([when.event, when.line]).toEqual(['OrderPlaced', 6]);
+      expect([when.events, when.line]).toEqual([['OrderPlaced'], 6]);
       expect(r.command).toBe('Create invoice');
       expect(r.informedBy.map((rm) => rm.name)).toEqual(['Price list']);
       expect(r.hotspots.map((h) => h.text)).toEqual(['Partial invoices?']);
@@ -204,6 +204,11 @@ describe('parse', () => {
           (i) => i.type,
         ),
       ).toEqual(['when', 'flow', 'when']);
+    });
+
+    it('lets a when name several events, separated by commas', () => {
+      const [, , when] = parse(lines('A', 'B: Do -> Done', 'when A ,Done', '  then C -> CDone')) as [Event, Flow, When];
+      expect(when.events).toEqual(['A', 'Done']);
     });
   });
 
@@ -309,6 +314,11 @@ describe('parse', () => {
     [1, "'when' expects an event name, got (Done)", 'when (Done)'],
     [2, "'when' has no reactions", lines('A: Do -> Done', 'when Done')],
     [1, "'when' refers to unknown event Nope", lines('when Nope', '  then B -> BDone')],
+    [2, "'when' refers to unknown event Nope", lines('A: Do -> Done', 'when Done, Nope', '  then B -> BDone')],
+    [1, "'when' expects an event name, got (Done)", 'when A, (Done)'],
+    [1, "empty event name in 'when'", 'when A,, B'],
+    [1, "empty event name in 'when'", 'when A,'],
+    [1, "'when' names A twice", 'when A, B, A'],
     [1, "'after' has no parent flow", lines('after 1 day', '  then B -> BDone')],
     [2, "'after' has no reactions", lines('A: Do -> Done', '  after 1 day')],
     [

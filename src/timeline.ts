@@ -3,7 +3,8 @@
  * all sections, as in Big Picture Event Storming. Sections are horizontal
  * swimlanes, top to bottom in order of first appearance. An event's column
  * is the longest chain of causes before it: an event comes after the event
- * its policy reacts to, and after the event before it in a run of events.
+ * its policy reacts to (each of them, for a 'when' on several), and after the
+ * event before it in a run of events.
  * Within a section, a flow, run or 'when' is never left of the one above it.
  * Events of a section that share a column stack, in source order.
  */
@@ -48,15 +49,16 @@ function collect(board: Board): Graph {
     if (!g.nodes.has(name)) g.nodes.set(name, { name, line, lane });
     if (!g.lanes.includes(g.nodes.get(name)!.lane)) g.lanes.push(g.nodes.get(name)!.lane);
   };
-  const steps = (parent: string, list: Step[], draw: 'arrow' | 'link') => {
+  /** Steps of LIST, each reacting to any of PARENTS. */
+  const steps = (parents: string[], list: Step[], draw: 'arrow' | 'link') => {
     for (const s of list) {
       if (s.type === 'after') {
-        steps(parent, s.reactions, draw);
+        steps(parents, s.reactions, draw);
         continue;
       }
       produce(s.event, s.line);
-      g.edges.push({ from: parent, to: s.event, weight: 1, draw });
-      steps(s.event, s.reactions, 'arrow');
+      for (const from of parents) g.edges.push({ from, to: s.event, weight: 1, draw });
+      steps([s.event], s.reactions, 'arrow');
     }
   };
   /** First event a step list produces, through 'after'. */
@@ -88,18 +90,18 @@ function collect(board: Board): Graph {
       case 'flow':
         produce(item.event, item.line);
         after(item.event);
-        steps(item.event, item.reactions, 'arrow');
+        steps([item.event], item.reactions, 'arrow');
         break;
       case 'event':
         produce(item.name, item.line);
         if (run === undefined) after(item.name);
         else g.edges.push({ from: run, to: item.name, weight: 1 });
-        steps(item.name, item.reactions, 'arrow');
+        steps([item.name], item.reactions, 'arrow');
         run = item.reactions.length ? undefined : item.name;
         break;
       case 'when':
         after(first(item.reactions));
-        steps(item.event, item.reactions, 'link');
+        steps(item.events, item.reactions, 'link');
         break;
     }
   }
