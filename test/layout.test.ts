@@ -287,6 +287,35 @@ describe('across lanes', () => {
     expect(find(stickies, 'B').x).toBe(find(stickies, 'whenever Done').x);
   });
 
+  describe('a when on several events', () => {
+    const { stickies, links } = lanes(
+      '== Sales ==',
+      'A: Do -> Done',
+      'B: Go -> Gone',
+      '== Billing ==',
+      'C: Bill -> Billed',
+      'when Done, Billed, Gone',
+      '  after 2 days',
+      '    then Charge -> Charged',
+    );
+    const policy = find(stickies, '⏰ 2 days after Done, Billed or Gone');
+
+    it('draws one policy, linked from each event', () => {
+      expect(stickies.filter((s) => s.kind === 'policy')).toEqual([policy]);
+      expect(links).toHaveLength(3);
+      expect(links.every((l) => l.at(-1)![1] === policy.y)).toBe(true);
+    });
+
+    it('starts right of the latest event', () => {
+      expect(policy.x).toBe(find(stickies, 'Gone').x + find(stickies, 'Gone').w + 30);
+    });
+  });
+
+  it('labels a policy on two events with or', () => {
+    const { stickies } = lanes('A', 'B', 'when A, B', '  then C -> D');
+    expect(stickies.filter((s) => s.kind === 'policy').map((s) => s.text)).toEqual(['whenever A or B']);
+  });
+
   it('keeps reactions in a lane under their event', () => {
     const { stickies } = lanes('A: Do -> Done', '  then B -> BDone');
     expect(find(stickies, 'whenever Done').x).toBe(find(stickies, 'Done').x);

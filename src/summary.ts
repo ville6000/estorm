@@ -55,18 +55,19 @@ function collect(board: Board): Facts {
     const aggregate = via.find((v) => v.type === 'aggregate');
     for (const r of rules) facts.rules.add(aggregate!.name, r.text);
   };
-  const steps = (event: string, list: Step[]) => {
+  /** Steps of LIST, each reacting to any of EVENTS. */
+  const steps = (events: string[], list: Step[]) => {
     for (const s of list) {
-      react(event);
+      for (const e of events) react(e);
       if (s.type === 'after') {
         if (s.unless !== undefined) react(s.unless);
-        steps(event, s.reactions);
+        steps(events, s.reactions);
         continue;
       }
       produce(s.event);
       command(s.command, s.via, s.rules);
       hotspots(s.hotspots, s.command);
-      steps(s.event, s.reactions);
+      steps([s.event], s.reactions);
     }
   };
 
@@ -81,10 +82,10 @@ function collect(board: Board): Facts {
       case 'event':
         produce(item.name);
         hotspots(item.hotspots, item.name);
-        steps(item.name, item.reactions);
+        steps([item.name], item.reactions);
         break;
       case 'when':
-        steps(item.event, item.reactions);
+        steps(item.events, item.reactions);
         break;
       case 'flow':
         produce(item.event);
@@ -94,7 +95,7 @@ function collect(board: Board): Facts {
           item.command,
         );
         hotspots(item.hotspots, item.command);
-        steps(item.event, item.reactions);
+        steps([item.event], item.reactions);
         break;
     }
   }

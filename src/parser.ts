@@ -68,11 +68,11 @@ export interface After {
   reactions: Step[];
 }
 
-/** Reacts to an event by name, usually one from another section. */
+/** Reacts to any of several events by name, usually ones from another section. */
 export interface When {
   type: 'when';
   line: number;
-  event: string;
+  events: string[];
   reactions: Step[];
 }
 
@@ -152,7 +152,7 @@ type Stmt = { line: number; level: number } & (
   | { type: 'rule'; text: string }
   | { type: 'section'; name: string }
   | { type: 'read-model'; name: string }
-  | { type: 'when'; event: string }
+  | { type: 'when'; events: string[] }
   | { type: 'after'; duration: string; unless?: string }
   | ({ type: 'flow'; actor?: string; schedule?: string } & Chain)
   | ({ type: 'reaction' } & Chain)
@@ -197,9 +197,12 @@ function classify(n: number, raw: string): Stmt | null {
     return { ...base, type: 'read-model', name: m[1]!.trim() };
   }
   if ((m = text.match(/^when\s+(.+)$/))) {
-    const event = m[1]!.trim();
-    checkEventName(n, 'when', event);
-    return { ...base, type: 'when', event };
+    const events = m[1]!.split(',').map((e) => e.trim());
+    if (events.includes('')) fail(n, "empty event name in 'when'");
+    for (const event of events) checkEventName(n, 'when', event);
+    const twice = events.find((e, i) => events.indexOf(e) !== i);
+    if (twice !== undefined) fail(n, `'when' names ${twice} twice`);
+    return { ...base, type: 'when', events };
   }
   if ((m = text.match(/^after\s+(.+?)(?:\s+unless\s+(.+))?$/))) {
     const unless = m[2]?.trim();
@@ -397,7 +400,7 @@ function checkTriggers(trees: Node[], broken: string[]): ParseError[] {
   for (const s of allSteps(trees)) {
     if (s.type !== 'when' && s.type !== 'after') continue;
     if (s.reactions.length === 0) errors.push(new ParseError(s.line, `'${s.type}' has no reactions`));
-    if (s.type === 'when' && !known.has(s.event)) unknown(s.line, 'when', s.event);
+    if (s.type === 'when') for (const e of s.events) if (!known.has(e)) unknown(s.line, 'when', e);
     if (s.type === 'after' && s.unless !== undefined && !known.has(s.unless)) unknown(s.line, 'unless', s.unless);
   }
   return errors;

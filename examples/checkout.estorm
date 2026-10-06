@@ -1,5 +1,6 @@
 # Web shop: from checkout to shipping
-# Shows sections (bounded contexts), 'when', 'after ... unless' and 'every'.
+# Shows sections (bounded contexts), 'when' (on one event or several), 'after ... unless'
+# and 'every'.
 
 == Sales ==
 ! Do we support guest checkout?
@@ -14,6 +15,9 @@ Customer: Cancel order -> (Order) -> OrderCancelled
 when PaymentCaptured
   then Confirm order -> (Order) -> OrderConfirmed
     then Send confirmation email -> [Email service] -> ConfirmationEmailSent
+
+when OrderCancelled, PaymentRefunded, PickupBooked
+  then Send order update -> [Email service] -> OrderUpdateSent
 
 == Payments ==
 when OrderPlaced

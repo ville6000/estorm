@@ -61,6 +61,19 @@ describe('timeline', () => {
     expect(col(stickies, 'PaymentCaptured')).toBe(col(stickies, 'OrderPlaced') + 1);
   });
 
+  it('puts a when on several events after the latest, linked from each', () => {
+    const { stickies, links } = board(
+      '== Sales ==',
+      'A: Do -> Early',
+      '  then B -> Late',
+      '== Billing ==',
+      'when Late, Early',
+      '  then C -> Charged',
+    );
+    expect(col(stickies, 'Charged')).toBe(col(stickies, 'Late') + 1);
+    expect(links).toHaveLength(2);
+  });
+
   it('puts a run of events in consecutive columns, without arrows', () => {
     const { stickies, arrows, links } = board('A', 'B', 'C');
     expect(['A', 'B', 'C'].map((e) => col(stickies, e))).toEqual([0, 1, 2]);

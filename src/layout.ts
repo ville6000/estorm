@@ -4,8 +4,8 @@
  * consecutive events on their own share one, and a reaction starts under the
  * event that triggered it. Sections are horizontal swimlanes, top to bottom
  * in order of first appearance, as in the timeline view. A 'when' reaction is
- * linked to the event it names by a dashed arrow; in another lane it starts
- * right of that event, on the next free row of its own lane. Nothing at the
+ * linked to each event it names by a dashed arrow; in another lane it starts
+ * right of those events, on the next free row of its own lane. Nothing at the
  * top level of a lane starts left of what is above it.
  */
 import type { After, Board, Event, Flow, Hotspot, Reaction, Step, When } from './parser.ts';
@@ -63,7 +63,7 @@ export interface Layout {
   stickies: Sticky[];
   /** Arrows within a row, and from an event to its reactions. */
   arrows: Path[];
-  /** From an event to the policies of a 'when' that names it. */
+  /** From an event to the policies of each 'when' that names it. */
   links: Path[];
   /** From the 'unless' event of an 'after' to the policies it cancels. */
   cancels: Path[];
@@ -124,15 +124,21 @@ function branch(e: Sticky, bottom: number, policy: Sticky, groupX: number, offse
 
 /** What a reaction reacts to. */
 interface Trigger {
-  /** The event's name. */
-  text: string;
+  /** The names of the events, any of which triggers it: several only for a 'when'. */
+  events: string[];
   /** The event's sticky; absent when it is placed elsewhere (a 'when'). */
   sticky?: Sticky;
   /** The 'after' that delays the reaction. */
   after?: After;
 }
 
-function policyText({ text, after }: Trigger): string {
+/** "A", "A or B", "A, B or C". */
+function anyOf(names: string[]): string {
+  return names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} or ${names.at(-1)}`;
+}
+
+function policyText({ events, after }: Trigger): string {
+  const text = anyOf(events);
   if (!after) return `whenever ${text}`;
   return `⏰ ${after.duration} after ${text}${after.unless ? `, unless ${after.unless}` : ''}`;
 }
@@ -248,14 +254,14 @@ function placeRow(lane: LaneBoard, step: Flow | Reaction, x: number, trigger?: T
     if (trigger.sticky) {
       lane.arrows.push(branch(trigger.sticky, lane.bottoms.get(trigger.sticky.y)!, policy, start));
     } else {
-      lane.pendingLinks.push({ event: trigger.text, policy, groupX: start, kind: 'link' });
+      for (const event of trigger.events) lane.pendingLinks.push({ event, policy, groupX: start, kind: 'link' });
     }
     const unless = trigger.after?.unless;
     if (unless !== undefined) {
       lane.pendingLinks.push({ event: unless, policy, groupX: start, kind: 'cancel' });
     }
   }
-  for (const r of step.reactions) placeStep(lane, r, event.x, { text: event.text, sticky: event });
+  for (const r of step.reactions) placeStep(lane, r, event.x, { events: [event.text], sticky: event });
 }
 
 /**
@@ -275,7 +281,7 @@ function placeEvents(lane: LaneBoard, events: Event[]): void {
   }
   lane.y += STICKY_H + GAP_Y;
   for (const r of events.at(-1)?.reactions ?? []) {
-    placeStep(lane, r, last!.x, { text: last!.text, sticky: last! });
+    placeStep(lane, r, last!.x, { events: [last!.text], sticky: last! });
   }
 }
 
@@ -298,20 +304,20 @@ function eventPositions(lanes: LaneBoard[]): Map<string, Position> {
 }
 
 /**
- * Places the reactions of a 'when'. In the lane of its event they start
- * under the event, in another lane right of it. Positions come from an
- * earlier pass (unknown at first).
+ * Places the reactions of a 'when'. They start under the latest of its
+ * events in the lane, or right of the latest in another lane, whichever is
+ * further right. Positions come from an earlier pass (unknown at first).
  *
  * What follows in the lane starts no further left, but only after a 'when'
- * on an event earlier in the file: one on a later event would push that
+ * on events earlier in the file: one on a later event would push that
  * event's own flow right, and itself with it, without end.
  */
-function placeWhen(lane: LaneBoard, { event, reactions, line }: When, positions: Map<string, Position>): void {
-  const pos = positions.get(event);
-  const same = pos !== undefined && pos.lane === lane.key;
-  const x = Math.max(pos === undefined ? 0 : same ? pos.x : pos.x + colX(1), lane.minX);
-  for (const r of reactions) placeStep(lane, r, x, { text: event });
-  if (pos !== undefined && pos.line < line) lane.minX = x;
+function placeWhen(lane: LaneBoard, { events, reactions, line }: When, positions: Map<string, Position>): void {
+  const known = events.flatMap((e) => positions.get(e) ?? []);
+  const xs = known.map((pos) => (pos.lane === lane.key ? pos.x : pos.x + colX(1)));
+  const x = Math.max(...xs, lane.minX);
+  for (const r of reactions) placeStep(lane, r, x, { events });
+  if (known.length === events.length && known.every((pos) => pos.line < line)) lane.minX = x;
 }
 
 function placeHotspotRow(lane: LaneBoard, hotspots: Hotspot[]): void {

@@ -87,8 +87,15 @@ section they start under the event; in another section, right of it, on the
 next free row of that section. What comes after a `when` in its section
 starts no further left, if its event is earlier in the file.
 
+A `when` may name several events, separated by commas: one policy reacts to
+any of them, labelled `whenever A, B or C`, with a dashed arrow from each.
+It starts at the latest of them, as above for each event.
+
 ```
 when Event
+  then Command -> Event
+
+when EventA, EventB, EventC
   then Command -> Event
 ```
 
@@ -181,7 +188,7 @@ rule       = indent , "*" , text ;
 read-model = indent , "{" , name , "}" ;
 flow       = [ name , ":" ] , name , chain ;
 reaction   = indent , "then" , " " , name , chain ;
-when       = "when" , " " , name ;
+when       = "when" , " " , name , { "," , name } ;
 after      = indent , "after" , " " , text , [ " unless " , name ] ;
 schedule   = "every" , " " , text , ":" , name , chain ;
 section    = "==" , text , "==" ;
@@ -259,14 +266,14 @@ delays. A schedule is a flow with `schedule` instead of `actor`:
 ```
 
 Sections are top-level markers; an item belongs to the nearest section above.
-A `when` takes its reactions:
+A `when` takes its reactions; `events` lists the events it names, in order:
 
 ```json
 [
   { "type": "section", "name": "Sales", "line": 1 },
   { "type": "flow", "line": 2, "event": "OrderPlaced", ... },
   { "type": "section", "name": "Billing", "line": 3 },
-  { "type": "when", "line": 4, "event": "OrderPlaced", "reactions": [ ... ] }
+  { "type": "when", "line": 4, "events": ["OrderPlaced"], "reactions": [ ... ] }
 ]
 ```
 
@@ -279,7 +286,8 @@ appearance. An event produced more than once is drawn once, in the section
 of its first producer.
 
 An event's column is the longest chain of causes before it: a reaction's
-event comes after the event it reacts to (also through `after` and `when`),
+event comes after the event it reacts to (also through `after` and `when`;
+after each of them for a `when` on several),
 and an event in a run comes after the one before it. Within a section, a
 flow, run or `when` is never left of the one above it. Events of a section
 in the same column stack, in source order. `unless` doesn't affect order.
@@ -330,7 +338,9 @@ Structure
 - `hotspot must follow a flow or reaction, not 'when'` (also `'after'`)
 - `'when' has no reactions` (also `'after'`)
 - `'when' expects an event name, got (Ticket)` (also `'unless'`)
-- `'when' refers to unknown event TicketSubmited`
+- `'when' refers to unknown event TicketSubmited` (once per unknown event)
+- `empty event name in 'when'`
+- `'when' names TicketClosed twice`
 - `'unless' refers to unknown event CustomerFolowedUp`
 
 ## Warnings
