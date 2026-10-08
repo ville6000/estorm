@@ -38,7 +38,7 @@ describe('parse', () => {
         actor: 'Customer',
         command: 'Submit ticket',
         via: [{ type: 'aggregate', name: 'Ticket' }],
-        event: 'TicketSubmitted',
+        events: ['TicketSubmitted'],
         rules: [],
         hotspots: [],
         reactions: [
@@ -48,7 +48,7 @@ describe('parse', () => {
             informedBy: [],
             command: 'Fetch customer details',
             via: [{ type: 'external', name: 'CRM' }],
-            event: 'CustomerDetailsFetched',
+            events: ['CustomerDetailsFetched'],
             rules: [],
             hotspots: [],
             reactions: [],
@@ -59,7 +59,7 @@ describe('parse', () => {
             informedBy: [{ type: 'read-model', name: 'Department topic mapping', line: 5 }],
             command: 'Assign by topic',
             via: [{ type: 'aggregate', name: 'Ticket' }],
-            event: 'TicketAssigned',
+            events: ['TicketAssigned'],
             rules: [],
             hotspots: [{ type: 'hotspot', text: 'Who owns the topic → department mapping?', line: 7 }],
             reactions: [],
@@ -79,7 +79,7 @@ describe('parse', () => {
           actor: 'Customer',
           command: 'Submit ticket',
           via: [],
-          event: 'TicketSubmitted',
+          events: ['TicketSubmitted'],
           rules: [],
           hotspots: [],
           reactions: [],
@@ -92,15 +92,26 @@ describe('parse', () => {
         actor: 'A',
         command: 'Do it',
         via: [{ type: 'external', name: 'X' }],
-        event: 'Done',
+        events: ['Done'],
       });
     });
 
     it('allows a flow without an actor', () => {
       const [flow] = parse(lines('Place order -> (Order) -> OrderPlaced', '  then Ship -> Shipped')) as [Flow];
-      expect(flow).toMatchObject({ type: 'flow', command: 'Place order', event: 'OrderPlaced' });
+      expect(flow).toMatchObject({ type: 'flow', command: 'Place order', events: ['OrderPlaced'] });
       expect(flow).not.toHaveProperty('actor');
       expect(flow.reactions).toHaveLength(1);
+    });
+
+    it('lets a chain end in several events, separated by commas', () => {
+      const [flow] = parse(lines('Agent: Reply -> (Ticket) -> TicketReplied ,TicketCompleted', '  ! Both?')) as [Flow];
+      expect(flow.events).toEqual(['TicketReplied', 'TicketCompleted']);
+      expect(flow.hotspots).toHaveLength(1);
+    });
+
+    it('lets when and unless name any event of several', () => {
+      const text = lines('A: Do -> Done, Failed', 'when Failed', '  after 1 day unless Done', '    then B -> BDone');
+      expect(parseAll(text).errors).toEqual([]);
     });
 
     it('accepts Windows line endings', () => {
@@ -112,10 +123,10 @@ describe('parse', () => {
     const ast = parse(
       lines('A: Do -> Done', '  then B -> BDone', '    then C -> CDone', '  then D -> DDone', 'E: Go -> Gone'),
     ) as Flow[];
-    expect(ast.map((f) => f.event)).toEqual(['Done', 'Gone']);
+    expect(ast.map((f) => f.events[0])).toEqual(['Done', 'Gone']);
     const reactions = ast[0]!.reactions as Reaction[];
-    expect(reactions.map((r) => r.event)).toEqual(['BDone', 'DDone']);
-    expect((reactions[0]!.reactions as Reaction[]).map((r) => r.event)).toEqual(['CDone']);
+    expect(reactions.map((r) => r.events[0])).toEqual(['BDone', 'DDone']);
+    expect((reactions[0]!.reactions as Reaction[]).map((r) => r.events[0])).toEqual(['CDone']);
   });
 
   it('skips blanks and comments', () => {
@@ -223,7 +234,7 @@ describe('parse', () => {
     it('gives an event its hotspots and reactions', () => {
       const [event] = parse(lines('OrderPlaced', '! Paid yet?', '  then Ship -> Shipped')) as [Event];
       expect(event.hotspots.map((h) => h.text)).toEqual(['Paid yet?']);
-      expect((event.reactions[0] as Reaction).event).toBe('Shipped');
+      expect((event.reactions[0] as Reaction).events).toEqual(['Shipped']);
     });
 
     it('lets when and unless refer to it', () => {
@@ -270,7 +281,12 @@ describe('parse', () => {
 
     it('parses every as a flow driven by a schedule; the time may contain colons', () => {
       const [flow] = parse('every night at 02:00: Archive -> Archived') as Flow[];
-      expect(flow).toMatchObject({ type: 'flow', schedule: 'night at 02:00', command: 'Archive', event: 'Archived' });
+      expect(flow).toMatchObject({
+        type: 'flow',
+        schedule: 'night at 02:00',
+        command: 'Archive',
+        events: ['Archived'],
+      });
       expect(flow).not.toHaveProperty('actor');
     });
 
@@ -319,6 +335,16 @@ describe('parse', () => {
     [1, "empty event name in 'when'", 'when A,, B'],
     [1, "empty event name in 'when'", 'when A,'],
     [1, "'when' names A twice", 'when A, B, A'],
+    [1, 'empty event name in chain', 'A: Do -> Done,, Failed'],
+    [1, 'empty event name in chain', 'A: Do -> Done,'],
+    [1, 'chain names Done twice', 'A: Do -> Done, Done'],
+    [1, 'invalid item: Done, (Order)', 'A: Do -> Done, (Order)'],
+    [2, "'then' can't follow several events; use 'when' with one of them", lines('A: Do -> B, C', '  then D -> E')],
+    [
+      3,
+      "'after' can't follow several events; use 'when' with one of them",
+      lines('A: Do -> B', '  then C -> D, E', '    after 1 day', '      then F -> G'),
+    ],
     [1, "'after' has no parent flow", lines('after 1 day', '  then B -> BDone')],
     [2, "'after' has no reactions", lines('A: Do -> Done', '  after 1 day')],
     [
@@ -380,6 +406,21 @@ describe('parseAll', () => {
     expect(errorsOf('A: Do ->', '  then B -> BDone', '    then C -> CDone', '  ! Why?', 'D: Do -> DDone')).toEqual([
       [1, 'empty item in chain'],
     ]);
+  });
+
+  it('reports each reaction under several events, leaving out what is under it', () => {
+    const text = lines(
+      'A: Do -> B, C',
+      '  then D -> E',
+      '    then F -> G',
+      '  after 1 day unless Nope',
+      '    then H -> I',
+    );
+    expect(errorsOf(text)).toEqual([
+      [2, "'then' can't follow several events; use 'when' with one of them"],
+      [4, "'after' can't follow several events; use 'when' with one of them"],
+    ]);
+    expect(parseAll(text).board).toMatchObject([{ events: ['B', 'C'], reactions: [] }]);
   });
 
   it('does not report the read models of a broken step', () => {

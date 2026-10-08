@@ -21,7 +21,16 @@ export function tokenize(line: string): Token[] {
     while (to > from && line[to - 1] === ' ') to--;
     if (from < to) tokens.push({ kind, from, to });
   };
-  /** COMMAND -> ITEM -> … -> EVENT, from START to the end of the line. */
+  /** Events from FROM to TO, separated by commas. */
+  const events = (from: number, to: number) => {
+    for (const comma of [...line.slice(from, to).matchAll(/,/g)].map((m) => from + m.index)) {
+      add('event', from, comma);
+      add('punct', comma, comma + 1);
+      from = comma + 1;
+    }
+    add('event', from, to);
+  };
+  /** COMMAND -> ITEM -> … -> EVENT, or EVENT, EVENT, from START to the end of the line. */
   const chain = (start: number) => {
     const parts = line.slice(start).split('->');
     let at = start;
@@ -29,7 +38,8 @@ export function tokenize(line: string): Token[] {
       const item = part.trim();
       const kind: TokenKind =
         i === 0 ? 'command' : item.startsWith('(') ? 'aggregate' : item.startsWith('[') ? 'external' : 'event';
-      add(kind, at, at + part.length);
+      if (kind === 'event' && i === parts.length - 1) events(at, at + part.length);
+      else add(kind, at, at + part.length);
       at += part.length;
       if (i < parts.length - 1) add('arrow', at, (at += 2));
     });
@@ -53,13 +63,7 @@ export function tokenize(line: string): Token[] {
     chain(start + 5);
   } else if (word('when')) {
     add('keyword', start, start + 4);
-    let at = start + 5;
-    for (const comma of [...line.slice(at).matchAll(/,/g)].map((m) => at + m.index)) {
-      add('event', at, comma);
-      add('punct', comma, comma + 1);
-      at = comma + 1;
-    }
-    add('event', at, line.length);
+    events(start + 5, line.length);
   } else if (word('after')) {
     add('keyword', start, start + 5);
     const unless = line.indexOf(' unless ', start + 5);

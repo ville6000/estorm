@@ -56,15 +56,17 @@ function collect(board: Board): Graph {
         steps(parents, s.reactions, draw);
         continue;
       }
-      produce(s.event, s.line);
-      for (const from of parents) g.edges.push({ from, to: s.event, weight: 1, draw });
-      steps([s.event], s.reactions, 'arrow');
+      for (const to of s.events) {
+        produce(to, s.line);
+        for (const from of parents) g.edges.push({ from, to, weight: 1, draw });
+      }
+      steps(s.events, s.reactions, 'arrow');
     }
   };
   /** First event a step list produces, through 'after'. */
   const first = (list: Step[]): string | undefined => {
     for (const s of list) {
-      const e = s.type === 'after' ? first(s.reactions) : s.event;
+      const e = s.type === 'after' ? first(s.reactions) : s.events[0];
       if (e !== undefined) return e;
     }
     return undefined;
@@ -88,9 +90,9 @@ function collect(board: Board): Graph {
         lane = item.name;
         break;
       case 'flow':
-        produce(item.event, item.line);
-        after(item.event);
-        steps([item.event], item.reactions, 'arrow');
+        for (const e of item.events) produce(e, item.line);
+        after(item.events[0]);
+        steps(item.events, item.reactions, 'arrow');
         break;
       case 'event':
         produce(item.name, item.line);

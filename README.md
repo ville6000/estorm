@@ -59,6 +59,7 @@ dependencies.
 | `Event`                                  | event, cause not known yet; a run of them is a timeline |
 | `Actor: Command -> Event`                | actor, command, event (actor optional)                  |
 | `-> (Aggregate) ->` / `-> [External] ->` | aggregate / external system                             |
+| `Command -> EventA, EventB`              | several events, stacked                                 |
 | `{Read model}`                           | read model, informing the next step                     |
 | `  then Command -> Event`                | policy reacting to the event above                      |
 | `  after 30 days unless Event`           | delayed policy, cancelled by an event                   |

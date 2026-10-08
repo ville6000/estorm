@@ -50,6 +50,20 @@ the command (or its read models).
 Command -> Event
 ```
 
+A command may produce several events, separated by commas: facts recorded
+at once, or possible outcomes, as stickies stacked on a wall. They stack in
+one column, an arrow forking to each. A step with several events can't take
+`then` or `after`: name the event with `when` instead. Hotspots and rules
+still follow it.
+
+```
+Agent: Reply -> (Ticket) -> TicketReplied, TicketCompleted
+every 5 minutes: Close stale -> (Ticket) -> TicketClosed, TicketCloseDeferred
+
+when TicketCloseDeferred
+  then Notify agent -> [Email] -> AgentNotified
+```
+
 **Reaction** — a policy reacts to the event of the nearest less-indented
 flow or reaction above it, and issues a command. The policy sticky is labelled
 `whenever <trigger event>`.
@@ -163,7 +177,11 @@ Guest: Book room -> (Booking) -> RoomBooked
 After the command, items are separated by `->`:
 
 - zero or more `(Aggregate)` / `[External]` items, in any order
-- exactly one bare item, which must be last: the **event**
+- exactly one bare item, which must be last: the **event**, or several
+  events separated by commas
+
+Commas are allowed in the name of an event on its own line, but not at the
+end of a chain, nor in `when`.
 
 Whitespace around `->` is ignored. Item text is trimmed and may contain spaces.
 
@@ -194,7 +212,7 @@ schedule   = "every" , " " , text , ":" , name , chain ;
 section    = "==" , text , "==" ;
 event      = name ;
 
-chain      = { arrow , ( aggregate | external ) } , arrow , name ;
+chain      = { arrow , ( aggregate | external ) } , arrow , name , { "," , name } ;
 arrow      = "->" ;
 aggregate  = "(" , name , ")" ;
 external   = "[" , name , "]" ;
@@ -219,7 +237,7 @@ its line). See `src/parser.ts` for the types. For the example above:
     "actor": "Customer",
     "command": "Submit ticket",
     "via": [{ "type": "aggregate", "name": "Ticket" }],
-    "event": "TicketSubmitted",
+    "events": ["TicketSubmitted"],
     "hotspots": [],
     "reactions": [
       {
@@ -228,7 +246,7 @@ its line). See `src/parser.ts` for the types. For the example above:
         "informedBy": [],
         "command": "Fetch customer details",
         "via": [{ "type": "external", "name": "CRM" }],
-        "event": "CustomerDetailsFetched",
+        "events": ["CustomerDetailsFetched"],
         "hotspots": [],
         "reactions": []
       },
@@ -238,7 +256,7 @@ its line). See `src/parser.ts` for the types. For the example above:
         "informedBy": [{ "type": "read-model", "name": "Department topic mapping", "line": 5 }],
         "command": "Assign by topic",
         "via": [{ "type": "aggregate", "name": "Ticket" }],
-        "event": "TicketAssigned",
+        "events": ["TicketAssigned"],
         "hotspots": [{ "type": "hotspot", "text": "Who owns the topic → department mapping?", "line": 7 }],
         "reactions": []
       }
@@ -246,6 +264,9 @@ its line). See `src/parser.ts` for the types. For the example above:
   }
 ]
 ```
+
+`events` lists the events of a flow or reaction, in order; one, or several
+from `A, B`.
 
 Read models are moved into `informedBy` of the statement they precede.
 A read model with no following flow or reaction is an error.
@@ -271,7 +292,7 @@ A `when` takes its reactions; `events` lists the events it names, in order:
 ```json
 [
   { "type": "section", "name": "Sales", "line": 1 },
-  { "type": "flow", "line": 2, "event": "OrderPlaced", ... },
+  { "type": "flow", "line": 2, "events": ["OrderPlaced"], ... },
   { "type": "section", "name": "Billing", "line": 3 },
   { "type": "when", "line": 4, "events": ["OrderPlaced"], "reactions": [ ... ] }
 ]
@@ -288,7 +309,8 @@ of its first producer.
 An event's column is the longest chain of causes before it: a reaction's
 event comes after the event it reacts to (also through `after` and `when`;
 after each of them for a `when` on several),
-and an event in a run comes after the one before it. Within a section, a
+and an event in a run comes after the one before it. Several events of one
+step share its column. Within a section, a
 flow, run or `when` is never left of the one above it. Events of a section
 in the same column stack, in source order. `unless` doesn't affect order.
 
@@ -327,6 +349,8 @@ Chains
 - `expected a command, got (Ticket)`
 - `expected (Aggregate) or [External], got TicketSubmitted`
 - `empty item in chain`
+- `empty event name in chain`
+- `chain names TicketClosed twice`
 - `invalid item: {Backlog}`
 
 Structure
@@ -336,6 +360,7 @@ Structure
 - `rule needs an (Aggregate) in its step`
 - `rule is ambiguous: step has several aggregates`
 - `hotspot must follow a flow or reaction, not 'when'` (also `'after'`)
+- `'then' can't follow several events; use 'when' with one of them` (also `'after'`)
 - `'when' has no reactions` (also `'after'`)
 - `'when' expects an event name, got (Ticket)` (also `'unless'`)
 - `'when' refers to unknown event TicketSubmited` (once per unknown event)
@@ -355,7 +380,3 @@ from rendering.
 - `aggregate Ticket is used in several contexts: Support, Billing`: the same
   aggregate appears in more than one section. Reported at its first use in
   the second context.
-
-## Open questions
-
-- One command → several events? (`-> A, B`)

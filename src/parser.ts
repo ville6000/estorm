@@ -30,10 +30,11 @@ export interface Via {
 interface Chain {
   command: string;
   via: Via[];
-  event: string;
+  /** The events the command produces: one, or several possible outcomes. */
+  events: string[];
 }
 
-/** An actor (or a schedule, or nobody yet) issues a command, producing an event. */
+/** An actor (or a schedule, or nobody yet) issues a command, producing one or more events. */
 export interface Flow extends Chain {
   type: 'flow';
   line: number;
@@ -130,7 +131,7 @@ function parseItem(s: string): Item | null {
   return null;
 }
 
-/** `Command -> ... -> Event` into {command, via, event}. */
+/** `Command -> ... -> Event` or `... -> EventA, EventB` into {command, via, events}. */
 function parseChain(line: number, s: string): Chain {
   const raw = s.split('->').map((x) => x.trim());
   if (raw.some((x) => x === '')) fail(line, 'empty item in chain');
@@ -143,7 +144,11 @@ function parseChain(line: number, s: string): Chain {
   if (event.type !== 'name') fail(line, `chain must end with an event, got ${raw.at(-1)}`);
   const bad = via.find((v) => v.type === 'name');
   if (bad) fail(line, `expected (Aggregate) or [External], got ${bad.name}`);
-  return { command: command!.name, via: via as Via[], event: event.name };
+  const events = event.name.split(',').map((e) => e.trim());
+  if (events.includes('')) fail(line, 'empty event name in chain');
+  const twice = events.find((e, i) => events.indexOf(e) !== i);
+  if (twice !== undefined) fail(line, `chain names ${twice} twice`);
+  return { command: command!.name, via: via as Via[], events };
 }
 
 /** A source line, classified, with its indentation level. */
@@ -380,6 +385,25 @@ function* allSteps(trees: Node[]): Generator<Node> {
 }
 
 /**
+ * A step with several events can't take 'then' or 'after': which event they
+ * react to would be unclear. Each is an error, and is left out with what is
+ * under it.
+ */
+function checkSeveral(trees: Node[]): ParseError[] {
+  const errors: ParseError[] = [];
+  for (const s of allSteps(trees)) {
+    if ((s.type === 'flow' || s.type === 'reaction') && s.events.length > 1) {
+      for (const r of s.reactions) {
+        const keyword = r.type === 'after' ? 'after' : 'then';
+        errors.push(new ParseError(r.line, `'${keyword}' can't follow several events; use 'when' with one of them`));
+      }
+      s.reactions = [];
+    }
+  }
+  return errors;
+}
+
+/**
  * Each 'when' and 'after' needs reactions, and the events they name must
  * exist. An event named on a BROKEN line may exist, so it isn't reported.
  * Names can't hold arrows, brackets or colons, so the line is split on them.
@@ -394,7 +418,7 @@ function checkTriggers(trees: Node[], broken: string[]): ParseError[] {
   };
   const known = new Set<string>();
   for (const s of allSteps(trees)) {
-    if (s.type === 'flow' || s.type === 'reaction') known.add(s.event);
+    if (s.type === 'flow' || s.type === 'reaction') for (const e of s.events) known.add(e);
     if (s.type === 'event') known.add(s.name);
   }
   for (const s of allSteps(trees)) {
@@ -447,7 +471,8 @@ export function parseAll(text: string): { board: Board; errors: ParseError[] } {
   });
   flushPending(acc);
   const trees = nest(acc.steps, 0);
-  const errors = [...acc.errors, ...checkTriggers(trees, broken)].sort((a, b) => a.line - b.line);
+  const several = checkSeveral(trees);
+  const errors = [...acc.errors, ...several, ...checkTriggers(trees, broken)].sort((a, b) => a.line - b.line);
   const board = [...(trees as (Flow | Event | When)[]), ...acc.board].sort((a, b) => a.line - b.line);
   return { board, errors };
 }
