@@ -44,6 +44,18 @@ describe('tokenize', () => {
     ]);
   });
 
+  it('marks each event at the end of a chain', () => {
+    expect(tokens('Do -> (Order) -> Paid, Failed')).toEqual([
+      ['command', 'Do'],
+      ['arrow', '->'],
+      ['aggregate', '(Order)'],
+      ['arrow', '->'],
+      ['event', 'Paid'],
+      ['punct', ','],
+      ['event', 'Failed'],
+    ]);
+  });
+
   it('splits after into duration and optional unless event', () => {
     expect(tokens('  after 30 days unless Paid')).toEqual([
       ['keyword', 'after'],

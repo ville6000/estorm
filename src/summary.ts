@@ -64,10 +64,10 @@ function collect(board: Board): Facts {
         steps(events, s.reactions);
         continue;
       }
-      produce(s.event);
+      s.events.forEach(produce);
       command(s.command, s.via, s.rules);
       hotspots(s.hotspots, s.command);
-      steps([s.event], s.reactions);
+      steps(s.events, s.reactions);
     }
   };
 
@@ -88,14 +88,14 @@ function collect(board: Board): Facts {
         steps(item.events, item.reactions);
         break;
       case 'flow':
-        produce(item.event);
+        item.events.forEach(produce);
         command(item.command, item.via, item.rules);
         facts.actors.add(
           item.actor ?? (item.schedule !== undefined ? `Every ${item.schedule}` : 'Unknown actor'),
           item.command,
         );
         hotspots(item.hotspots, item.command);
-        steps([item.event], item.reactions);
+        steps(item.events, item.reactions);
         break;
     }
   }

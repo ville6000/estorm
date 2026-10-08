@@ -74,6 +74,14 @@ describe('timeline', () => {
     expect(links).toHaveLength(2);
   });
 
+  it('stacks several events of one step in one column, each after the cause', () => {
+    const { stickies, arrows } = board('A', '  then Do -> Paid, Failed', 'when Failed', '  then Retry -> Retried');
+    expect([col(stickies, 'Paid'), col(stickies, 'Failed')]).toEqual([1, 1]);
+    expect(at(stickies, 'Failed').y).toBeGreaterThan(at(stickies, 'Paid').y);
+    expect(col(stickies, 'Retried')).toBe(2);
+    expect(arrows).toHaveLength(2);
+  });
+
   it('puts a run of events in consecutive columns, without arrows', () => {
     const { stickies, arrows, links } = board('A', 'B', 'C');
     expect(['A', 'B', 'C'].map((e) => col(stickies, e))).toEqual([0, 1, 2]);

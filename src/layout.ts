@@ -1,7 +1,8 @@
 /**
  * Places AST stickies on the board. Time runs left to right on one axis
  * shared by all sections; every flow and reaction gets its own row,
- * consecutive events on their own share one, and a reaction starts under the
+ * consecutive events on their own share one, a step's several events stack
+ * in one column, and a reaction starts under the
  * event that triggered it. Sections are horizontal swimlanes, top to bottom
  * in order of first appearance, as in the timeline view. A 'when' reaction is
  * linked to each event it names by a dashed arrow; in another lane it starts
@@ -16,6 +17,8 @@ export const STICKY_H = 100;
 export const GAP_X = 30;
 export const GAP_Y = 40;
 export const FLOW_GAP = 40;
+/** Between the events of a step with several, stacked in one column. */
+export const STACK_GAP = 10;
 export const MARGIN = 20;
 export const LANE_LABEL_H = 36;
 export const LANE_PAD = 30;
@@ -88,12 +91,22 @@ function addBottoms(bottoms: Bottoms, stickies: Sticky[]): void {
   for (const s of stickies) bottoms.set(s.y, Math.max(bottoms.get(s.y) ?? -Infinity, s.y + s.h));
 }
 
-/** Straight arrow from the right side of A to the left side of B. */
+/** Arrow from the right side of A to the left side of B: straight, or forking down to a stacked event. */
 function arrow(a: Sticky, b: Sticky): Path {
-  const y = a.y + 0.5 * STICKY_H;
+  const ay = a.y + 0.5 * STICKY_H;
+  const by = b.y + 0.5 * STICKY_H;
+  if (ay === by) {
+    return [
+      [a.x + a.w, ay],
+      [b.x, ay],
+    ];
+  }
+  const mx = b.x - 0.5 * GAP_X;
   return [
-    [a.x + a.w, y],
-    [b.x, y],
+    [a.x + a.w, ay],
+    [mx, ay],
+    [mx, by],
+    [b.x, by],
   ];
 }
 
@@ -103,18 +116,37 @@ function arrow(a: Sticky, b: Sticky): Path {
  * row is entered straight from above; otherwise the arrow runs down a rail
  * left of the row, then over the row into the top of the policy. Sibling
  * reactions share the rail; OFFSET shifts the route so links run beside it.
- * CLEAR, if given, moves the rail off any sticky between its ends.
+ * CLEAR, if given, moves the rail off any sticky between its ends. An event
+ * with others stacked under it (SIDE) is left on its right instead.
  */
-function branch(e: Sticky, bottom: number, policy: Sticky, groupX: number, offset = 0, clear?: Clear): Path {
+function branch(
+  e: Sticky,
+  bottom: number,
+  policy: Sticky,
+  groupX: number,
+  offset = 0,
+  clear?: Clear,
+  side = false,
+): Path {
   const midX = e.x + 0.5 * STICKY_W + 2 * offset;
   const below = bottom + 0.5 * GAP_Y + offset;
+  const sideX = e.x + e.w + 0.5 * GAP_X + offset;
+  const out: Point[] = side
+    ? [
+        [e.x + e.w, e.y + 0.5 * STICKY_H],
+        [sideX, e.y + 0.5 * STICKY_H],
+        [sideX, below],
+      ]
+    : [
+        [midX, e.y + STICKY_H],
+        [midX, below],
+      ];
   const above = policy.y - 0.5 * GAP_Y + offset;
   const px = policy.x + 0.5 * STICKY_W + 2 * offset;
   const preferred = groupX - 0.5 * GAP_X - offset;
   const rail = clear ? clear(preferred, Math.min(below, above), Math.max(below, above)) : preferred;
   return [
-    [midX, e.y + STICKY_H],
-    [midX, below],
+    ...out,
     ...(below === above
       ? [[px, below] as Point]
       : [[rail, below] as Point, [rail, above] as Point, [px, above] as Point]),
@@ -145,7 +177,7 @@ function policyText({ events, after }: Trigger): string {
 
 type Row = [Kind, string, number][];
 
-/** [kind, text, line] for each sticky of STEP's row, in time order. */
+/** [kind, text, line] for each sticky of STEP's row, in time order; its events last. */
 function chain(step: Flow | Reaction, trigger: Trigger | undefined): Row {
   const { line } = step;
   const flow = step.type === 'flow' ? step : undefined;
@@ -161,26 +193,33 @@ function chain(step: Flow | Reaction, trigger: Trigger | undefined): Row {
     ...lead,
     ['command', step.command, line],
     ...step.via.map((v): [Kind, string, number] => [v.type, v.name, line]),
-    ['event', step.event, line],
+    ...step.events.map((e): [Kind, string, number] => ['event', e, line]),
   ];
 }
 
 /** Kinds that touch the sticky after them: read models, actor or policy, and their command form one group. */
 const GROUP_KINDS = new Set<Kind>(['read-model', 'actor', 'schedule', 'policy']);
 
-/** Lane-local x of each sticky of a row of KINDS starting at X0. */
-function rowXs(kinds: Kind[], x0: number): number[] {
-  const xs = [x0];
-  for (const kind of kinds.slice(0, -1)) {
-    xs.push(xs.at(-1)! + STICKY_W + (GROUP_KINDS.has(kind) ? 0 : GAP_X));
-  }
-  return xs;
+/** Lane-local [x, y] of each sticky of a row of KINDS starting at X0, Y0; the events stack in one column. */
+function rowXYs(kinds: Kind[], x0: number, y0: number): Point[] {
+  const at: Point[] = [[x0, y0]];
+  kinds.slice(1).forEach((kind, i) => {
+    const [x, y] = at.at(-1)!;
+    const prev = kinds[i]!;
+    if (kind === 'event' && prev === 'event') at.push([x, y + STICKY_H + STACK_GAP]);
+    else at.push([x + STICKY_W + (GROUP_KINDS.has(prev) ? 0 : GAP_X), y]);
+  });
+  return at;
 }
 
-/** Arrows between the stickies of a row, from the command on. */
+/** Arrows between the stickies of a row, from the command on, forking to each event. */
 function flowArrows(placed: Sticky[]): Path[] {
   const from = placed.slice(placed.findIndex((s) => !GROUP_KINDS.has(s.kind)));
-  return from.slice(1).map((s, i) => arrow(from[i]!, s));
+  const first = from.findIndex((s) => s.kind === 'event');
+  return [
+    ...from.slice(1, first).map((s, i) => arrow(from[i]!, s)),
+    ...from.slice(first).map((s) => arrow(from[first - 1]!, s)),
+  ];
 }
 
 type LaneKey = string | null;
@@ -232,22 +271,23 @@ function placeRow(lane: LaneBoard, step: Flow | Reaction, x: number, trigger?: T
   const { y } = lane;
   const items = chain(step, trigger);
   const start = Math.max(0, x - STICKY_W * step.informedBy.length);
-  const xs = rowXs(
+  const xys = rowXYs(
     items.map(([kind]) => kind),
     start,
+    y,
   );
-  const placed = items.map(([kind, text, line], i) => sticky(kind, text, line, xs[i]!, y));
+  const placed = items.map(([kind, text, line], i) => sticky(kind, text, line, ...xys[i]!));
   const rules = step.rules.map((r) => r.text);
   const aggregate = placed.find((s) => s.kind === 'aggregate');
   if (aggregate && rules.length) {
     aggregate.rules = rules;
     aggregate.h = Math.max(STICKY_H, ruled(aggregate.text, rules, aggregate.w).height);
   }
-  const event = placed.at(-1)!;
+  const event = placed[items.length - step.events.length]!;
   const hotspots = step.hotspots.map((h: Hotspot, i) => sticky('hotspot', h.text, h.line, event.x + colX(i + 1), y));
   addStickies(lane, [...placed, ...hotspots]);
   lane.arrows.push(...flowArrows(placed));
-  lane.y += maxOf(placed.map((s) => s.h)) + GAP_Y;
+  lane.y = maxOf(placed.map((s) => s.y + s.h)) + GAP_Y;
 
   if (trigger) {
     const policy = placed[step.informedBy.length]!;
@@ -454,15 +494,30 @@ function clearOf(stickies: Sticky[]): Clear {
   };
 }
 
+/**
+ * Event stickies with another stacked under them. Each event of a stack gets
+ * the bottom of its whole row in BOTTOMS, so links from it run under the row.
+ */
+function stacks(stickies: Sticky[], bottoms: Bottoms): Set<Sticky> {
+  const events = stickies.filter((s) => s.kind === 'event').sort((a, b) => a.y - b.y);
+  const at = new Map(events.map((s) => [`${s.x},${s.y}`, s]));
+  const under = (s: Sticky) => at.get(`${s.x},${s.y + STICKY_H + STACK_GAP}`);
+  const stacked = new Set(events.filter((s) => under(s)));
+  for (const s of [...stacked].reverse()) bottoms.set(s.y, Math.max(bottoms.get(s.y)!, bottoms.get(under(s)!.y)!));
+  for (const s of stacked) bottoms.set(under(s)!.y, bottoms.get(s.y)!);
+  return stacked;
+}
+
 /** Elbow arrow from the first event sticky named EVENT into POLICY. Cancel links run beside 'when' links. */
 function link(
   events: Map<string, Sticky>,
   bottoms: Bottoms,
+  stacked: Set<Sticky>,
   { event, policy, groupX, kind }: PendingLink,
   clear: Clear,
 ): Path {
   const e = events.get(event)!;
-  return branch(e, bottoms.get(e.y)!, policy, groupX, kind === 'cancel' ? -6 : 6, clear);
+  return branch(e, bottoms.get(e.y)!, policy, groupX, kind === 'cancel' ? -6 : 6, clear, stacked.has(e));
 }
 
 const MAX_PASSES = 10;
@@ -477,9 +532,10 @@ function connect(placed: LaneBoard[]): Pick<Layout, 'stickies' | 'arrows' | 'lin
   const pending = placed.flatMap((l) => l.pendingLinks).filter((l) => events.has(l.event));
   const bottoms: Bottoms = new Map();
   addBottoms(bottoms, stickies);
+  const stacked = stacks(stickies, bottoms);
   const rails = clearOf(stickies);
-  const links = pending.filter((l) => l.kind === 'link').map((l) => link(events, bottoms, l, rails));
-  const cancels = pending.filter((l) => l.kind === 'cancel').map((l) => link(events, bottoms, l, rails));
+  const links = pending.filter((l) => l.kind === 'link').map((l) => link(events, bottoms, stacked, l, rails));
+  const cancels = pending.filter((l) => l.kind === 'cancel').map((l) => link(events, bottoms, stacked, l, rails));
   return { stickies, arrows, links, cancels };
 }
 

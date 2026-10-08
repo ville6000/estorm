@@ -25,6 +25,10 @@ describe('lint', () => {
     expect(warnings('A: Do -> Done\n  then Ship -> (Order) -> Shipped')).toEqual([]);
   });
 
+  it('checks each of several events', () => {
+    expect(warnings('A: Do -> Done, Fail')).toEqual([{ line: 1, message: 'event should be in the past tense: Fail' }]);
+  });
+
   it('flags each event not in the past tense once, at its first line', () => {
     expect(warnings('Ready\nA: Start -> (X) -> Begin\n  then Go -> Ready\nwhen Begin\n  then Go -> Gone')).toEqual([
       { line: 1, message: 'event should be in the past tense: Ready' },

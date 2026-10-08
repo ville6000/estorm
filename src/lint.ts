@@ -61,7 +61,7 @@ export function lint(board: Board): Warning[] {
   const steps = (list: Step[]) => {
     for (const s of list) {
       if (s.type === 'reaction') {
-        event(s.event, s.line);
+        for (const e of s.events) event(e, s.line);
         via(s.via, s.line);
       }
       steps(s.reactions);
@@ -81,7 +81,7 @@ export function lint(board: Board): Warning[] {
         steps(item.reactions);
         break;
       case 'flow':
-        event(item.event, item.line);
+        for (const e of item.events) event(e, item.line);
         via(item.via, item.line);
         steps(item.reactions);
         break;

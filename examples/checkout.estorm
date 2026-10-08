@@ -1,6 +1,6 @@
 # Web shop: from checkout to shipping
-# Shows sections (bounded contexts), 'when' (on one event or several), 'after ... unless'
-# and 'every'.
+# Shows sections (bounded contexts), a command with several outcomes, 'when' (on one
+# event or several), 'after ... unless' and 'every'.
 
 == Sales ==
 ! Do we support guest checkout?
@@ -21,8 +21,11 @@ when OrderCancelled, PaymentRefunded, PickupBooked
 
 == Payments ==
 when OrderPlaced
-  then Charge card -> [Payment provider] -> PaymentCaptured
+  then Charge card -> [Payment provider] -> PaymentCaptured, PaymentDeclined
   ! What if the charge succeeds but our callback times out?
+
+when PaymentDeclined
+  then Ask for another card -> [Email service] -> NewCardRequested
 
 when OrderCancelled
   then Refund payment -> [Payment provider] -> PaymentRefunded

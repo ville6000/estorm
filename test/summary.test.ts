@@ -38,6 +38,15 @@ describe('summarize', () => {
     expect(out).not.toMatch(/- (Placed|Cancelled)\n/); // each is reacted to
   });
 
+  it('counts each of several events as produced', () => {
+    const out = summary(
+      ['== Billing ==', 'A: Charge -> Paid, Failed', '== Support ==', 'when Failed', '  then B -> Told'].join('\n'),
+    );
+    expect(out).toContain('- Billing → Support: Failed\n');
+    expect(out).toContain('- Paid\n');
+    expect(out).not.toContain('- Failed\n');
+  });
+
   it('groups commands by actor, aggregate and external system', () => {
     const text = [
       'Member: Borrow -> (Loan) -> (Copy) -> Borrowed',

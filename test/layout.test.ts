@@ -200,6 +200,52 @@ describe('layout', () => {
     });
   });
 
+  describe('several events', () => {
+    const { stickies, arrows, links } = board(
+      'A: Do -> (Agg) -> Done, Failed, Lost',
+      '  ! Why three?',
+      'when Done',
+      '  then B -> BDone',
+      'when Failed',
+      '  then C -> CDone',
+    );
+    const [done, failed, lost] = ['Done', 'Failed', 'Lost'].map((e) => find(stickies, e, 'event'));
+    const bottom = lost!.y + lost!.h;
+
+    it('stacks them in one column, in order', () => {
+      expect([failed!.x, lost!.x]).toEqual([done!.x, done!.x]);
+      expect(failed!.y).toBeGreaterThan(done!.y + done!.h);
+      expect(lost!.y).toBeGreaterThan(failed!.y + failed!.h);
+    });
+
+    it('forks an arrow from the aggregate to each', () => {
+      const agg = find(stickies, 'Agg');
+      for (const e of [done!, failed!, lost!]) {
+        const into = arrows.filter((a) => a.at(-1)![0] === e.x && a.at(-1)![1] === e.y + e.h / 2);
+        expect(into).toHaveLength(1);
+        expect(into[0]![0]).toEqual([right(agg), agg.y + agg.h / 2]);
+      }
+    });
+
+    it('puts hotspots right of the first', () => {
+      expect(find(stickies, 'Why three?')).toMatchObject({ x: done!.x + 180, y: done!.y });
+    });
+
+    it('starts the next row under the stack', () => {
+      expect(find(stickies, 'whenever Done').y).toBeGreaterThan(bottom);
+    });
+
+    it('leads links from stacked events beside the stack, under it', () => {
+      for (const l of links) {
+        const [x0] = l[0]!;
+        const [x1, y1] = l[2]!;
+        expect(x0).toBe(right(done!));
+        expect(x1).toBeGreaterThan(right(done!));
+        expect(y1).toBeGreaterThan(bottom);
+      }
+    });
+  });
+
   it('keeps a link that dips below the last row on the board', () => {
     const { height, links } = board('== A ==', 'X: Do -> Done', '== B ==', 'when Done', '  then B -> BDone');
     expect(links.flat().every(([, y]) => y < height)).toBe(true);
