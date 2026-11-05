@@ -53,6 +53,11 @@ export function wrap(text: string, maxChars: number): string[] {
   return lines;
 }
 
+/** Height a sticky of width W needs for TEXT, wrapped and centred. */
+export function textHeight(text: string, w: number): number {
+  return wrap(text, maxChars(w)).length * LINE_HEIGHT + 2 * PADDING;
+}
+
 /**
  * A sticky of width W that lists RULES under its name TEXT: the wrapped
  * lines, and y offsets from its top. A divider separates name and rules.

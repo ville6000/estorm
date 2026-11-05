@@ -52,6 +52,32 @@ describe('layout', () => {
     expect(policies[0]!.y).toBeLessThan(policies[1]!.y);
   });
 
+  describe('long policies', () => {
+    const { stickies, arrows } = board(
+      'A: Submit -> TicketSubmittedByCustomerViaPortal',
+      '  after 30 days unless CustomerFollowedUpOnTheirTicket',
+      '    then Close -> TicketClosed',
+      '      then Archive -> TicketArchived',
+      'B: Follow up -> CustomerFollowedUpOnTheirTicket',
+    );
+    const policy = stickies.find((s) => s.kind === 'policy' && s.text.startsWith('⏰'))!;
+
+    it('grows a policy to fit its text', () => {
+      expect(policy.h).toBeGreaterThan(find(stickies, 'Close').h);
+    });
+
+    it('keeps short policies the usual height', () => {
+      expect(find(stickies, 'whenever TicketClosed').h).toBe(find(stickies, 'Close').h);
+    });
+
+    it('pushes the next row, and the arrow to it, below the tall policy', () => {
+      const next = find(stickies, 'whenever TicketClosed');
+      expect(next.y).toBeGreaterThan(policy.y + policy.h);
+      const branch = arrows.find((a) => a.at(-1)![0] === next.x + 0.5 * next.w && a.at(-1)![1] === next.y)!;
+      expect(branch[1]![1]).toBeGreaterThan(policy.y + policy.h);
+    });
+  });
+
   describe('hotspots', () => {
     it('puts board hotspots on a row of their own above the flows', () => {
       const [hotspot, actor] = board('! Why?', 'A: Do -> Done').stickies;

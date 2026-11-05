@@ -66,7 +66,7 @@ when TicketCloseDeferred
 
 **Reaction** — a policy reacts to the event of the nearest less-indented
 flow or reaction above it, and issues a command. The policy sticky is labelled
-`whenever <trigger event>`.
+`whenever <trigger event>`, and grows taller to fit a long label.
 
 ```
   then Command -> Event

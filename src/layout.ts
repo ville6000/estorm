@@ -10,7 +10,7 @@
  * top level of a lane starts left of what is above it.
  */
 import type { After, Board, Event, Flow, Hotspot, Reaction, Step, When } from './parser.ts';
-import { maxOf, ruled } from './text.ts';
+import { maxOf, ruled, textHeight } from './text.ts';
 
 export const STICKY_W = 150;
 export const STICKY_H = 100;
@@ -277,6 +277,9 @@ function placeRow(lane: LaneBoard, step: Flow | Reaction, x: number, trigger?: T
     y,
   );
   const placed = items.map(([kind, text, line], i) => sticky(kind, text, line, ...xys[i]!));
+  // A policy names its trigger events, and an 'after''s duration and 'unless' event: it grows to fit them.
+  const policy = trigger ? placed[step.informedBy.length]! : undefined;
+  if (policy) policy.h = Math.max(STICKY_H, textHeight(policy.text, policy.w));
   const rules = step.rules.map((r) => r.text);
   const aggregate = placed.find((s) => s.kind === 'aggregate');
   if (aggregate && rules.length) {
@@ -289,8 +292,7 @@ function placeRow(lane: LaneBoard, step: Flow | Reaction, x: number, trigger?: T
   lane.arrows.push(...flowArrows(placed));
   lane.y = maxOf(placed.map((s) => s.y + s.h)) + GAP_Y;
 
-  if (trigger) {
-    const policy = placed[step.informedBy.length]!;
+  if (trigger && policy) {
     if (trigger.sticky) {
       lane.arrows.push(branch(trigger.sticky, lane.bottoms.get(trigger.sticky.y)!, policy, start));
     } else {
