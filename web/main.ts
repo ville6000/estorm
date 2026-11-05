@@ -5,7 +5,8 @@
  * This file holds the app's state and wires the page to it; the parts live in
  * codemirror.ts (the source editor), files.ts (open, save, export), html.ts
  * (panel contents), viewport.ts (the board's pane: zoom, fit, pan.ts gestures),
- * prefs.ts (local storage) and share.ts (links).
+ * split.ts (resizing the editor), fullscreen.ts (the board alone), prefs.ts
+ * (local storage) and share.ts (links).
  */
 import { EditorView } from '@codemirror/view';
 import {
@@ -23,9 +24,11 @@ import {
 import { createState, goToLine, setErrorLines, setVimKeys, Vim } from './codemirror.ts';
 import { canPick, download, type FileHandle, pickFile, pickSaveFile, svgToPng, writeTo } from './files.ts';
 import { copies } from './copy.ts';
+import { fullScreen } from './fullscreen.ts';
 import { errorsHtml, summaryHtml, warningsHtml } from './html.ts';
 import * as prefs from './prefs.ts';
 import { decode, encode } from './share.ts';
+import { splitter } from './split.ts';
 import { viewport } from './viewport.ts';
 
 // Where links from the downloaded file point, since file:// links don't work for others.
@@ -65,6 +68,12 @@ const state = {
 
 const view = new EditorView({ parent: $('source') });
 const boardView = viewport(board.parentElement!, board, zoomReset);
+const boardOnly = fullScreen($('full-screen'), (on) => {
+  // Keys mustn't go to the hidden editor.
+  if (on) view.contentDOM.blur();
+  boardView.fit();
+});
+splitter($('splitter'), board.closest('.workspace')!, $('editor-pane'));
 
 function sourceText(): string {
   return view.state.doc.toString();
@@ -193,11 +202,11 @@ async function shareLink(): Promise<string> {
 
 const on = (id: string, f: () => unknown) => $(id).addEventListener('click', () => void f());
 
-/** Clicks on anything in EL with a data-line attribute jump to that line. */
+/** Clicks on anything in EL with a data-line attribute jump to that line, unless the editor is hidden. */
 function jumpsToLines(el: HTMLElement): void {
   el.addEventListener('click', (e) => {
     const target = (e.target as Element).closest('[data-line]');
-    if (target) goToLine(view, Number(target.getAttribute('data-line')));
+    if (target && !boardOnly.active()) goToLine(view, Number(target.getAttribute('data-line')));
   });
 }
 

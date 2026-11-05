@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ParseError } from '../src/index.ts';
 import { errorsHtml, escape, summaryHtml, warningsHtml } from '../web/html.ts';
+import { editorShare, MIN_PANE } from '../web/split.ts';
 import {
   boardAt,
   clampZoom,
@@ -84,5 +85,16 @@ describe('zoom', () => {
     expect(wheelFactor(100)).toBeLessThan(1);
     expect(wheelFactor(1000)).toBe(wheelFactor(100));
     expect(wheelFactor(-4)).toBeLessThan(wheelFactor(-100));
+  });
+});
+
+describe('split', () => {
+  it('gives the editor the share up to the bar', () => {
+    expect(editorShare(400, 1000)).toBe(0.4);
+  });
+
+  it('leaves both panes at least MIN_PANE', () => {
+    expect(editorShare(10, 1000)).toBe(MIN_PANE / 1000);
+    expect(editorShare(990, 1000)).toBe((1000 - MIN_PANE) / 1000);
   });
 });

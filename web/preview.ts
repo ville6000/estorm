@@ -6,6 +6,7 @@
 import { layout, lint, parseAll, summarize, svg, timeline, type Board, type Theme } from '../src/index.ts';
 import { copies } from './copy.ts';
 import { download, svgToPng } from './files.ts';
+import { fullScreen } from './fullscreen.ts';
 import { escape, summaryHtml, warningsHtml } from './html.ts';
 import * as prefs from './prefs.ts';
 import { viewport } from './viewport.ts';
@@ -130,6 +131,9 @@ on('summary-toggle', () => {
   summaryButton.setAttribute('aria-expanded', String(!summaryPanel.hidden));
 });
 copies($('copy-summary'), () => state.summary, 'Copied');
+// The page is the board alone already, so without true full screen the button would do nothing.
+$('full-screen').hidden = !document.fullscreenEnabled;
+fullScreen($('full-screen'), boardView.fit);
 
 exportPicker.addEventListener('change', () => {
   const format = exportPicker.value;

@@ -31,7 +31,7 @@
           Share
         </button>
       </div>
-      <div class="group" role="group" aria-label="Editor">
+      <div class="group editor-group" role="group" aria-label="Editor">
         <button id="vim" type="button" aria-pressed="false" title="Toggle vim keybindings (:w saves)">Vim</button>
         <button id="help" type="button" aria-expanded="false" aria-controls="cheatsheet">Syntax</button>
       </div>
@@ -59,6 +59,14 @@
           <button id="zoom-in" type="button" title="Zoom in">+</button>
           <button id="zoom-fit" type="button" title="Fit to width">Fit</button>
         </div>
+        <button
+          id="full-screen"
+          type="button"
+          aria-pressed="false"
+          title="Show the board alone, filling the screen (Esc leaves)"
+        >
+          Full screen
+        </button>
       </div>
       <a
         class="repo"
@@ -76,10 +84,22 @@
     </header>
 
     <main class="workspace">
-      <section class="editor-pane" aria-label="Editor">
+      <section id="editor-pane" class="editor-pane" aria-label="Editor">
         <div id="source" class="editor"></div>
         <div id="errors" class="errors" role="alert" hidden></div>
       </section>
+
+      <div
+        id="splitter"
+        class="splitter"
+        role="separator"
+        tabindex="0"
+        aria-controls="editor-pane"
+        aria-label="Editor size"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        title="Drag to resize the editor; double-click for the default size"
+      ></div>
 
       <section class="preview-pane" aria-label="Board">
         <div id="board" class="board"></div>
@@ -115,6 +135,7 @@ every night at 02:00: Command -> Event
 </pre>
         <p>Indent with 2 spaces. Click a sticky to jump to its line.</p>
         <p>Drag the board to pan; Ctrl/⌘ + wheel or pinch to zoom. Click a section's name to fit it.</p>
+        <p>Drag the line between the editor and the board to resize them.</p>
         <p>
           <a href="https://github.com/ville6000/estorm/blob/main/GRAMMAR.md" target="_blank" rel="noopener"
             >Full grammar</a

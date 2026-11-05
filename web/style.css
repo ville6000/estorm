@@ -148,10 +148,13 @@ select:focus-visible {
   color: var(--text);
 }
 
+/* The editor, the bar between (split.ts) and the board. Once the bar is
+   moved, --editor-size is the editor's share; each pane keeps at least
+   split.ts MIN_PANE. */
 .workspace {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(280px, 38%) 1fr;
+  grid-template-columns: clamp(160px, var(--editor-size, 38%), calc(100% - 160px)) 1px 1fr;
   flex: 1;
   min-height: 0;
 }
@@ -160,8 +163,48 @@ select:focus-visible {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-right: 1px solid var(--border);
   background: var(--panel);
+}
+
+.splitter {
+  position: relative;
+  /* Its handle reaches over the board, which comes after it. */
+  z-index: 1;
+  background: var(--border);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+/* The handle: wider than the line, to be easier to grab. */
+.splitter::before {
+  content: '';
+  position: absolute;
+  inset: 0 -4px;
+}
+
+.splitter:hover,
+.splitter:focus-visible,
+.resizing .splitter {
+  outline: none;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.resizing {
+  user-select: none;
+}
+
+/* Full screen (fullscreen.ts): the board alone. */
+.board-only .workspace:not(.viewer) {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+
+.board-only .editor-pane,
+.board-only .splitter,
+.board-only .editor-group,
+.board-only .cheatsheet {
+  display: none;
 }
 
 .editor {
@@ -314,7 +357,7 @@ select:focus-visible {
 }
 
 /* The live preview (preview.html): the board alone, errors above it. Nothing
-   jumps to lines there, as there's no editor. */
+   jumps to lines there, as there's no editor; nor in full screen. */
 .workspace.viewer {
   grid-template-columns: 1fr;
   grid-template-rows: auto 1fr;
@@ -335,11 +378,13 @@ select:focus-visible {
   white-space: pre-wrap;
 }
 
-.viewer .board svg g[data-line] {
+.viewer .board svg g[data-line],
+.board-only .board svg g[data-line] {
   cursor: inherit;
 }
 
-.viewer #warnings button {
+.viewer #warnings button,
+.board-only #warnings button {
   cursor: text;
   text-decoration: none;
 }
@@ -381,6 +426,8 @@ select:focus-visible {
 
 .panel {
   position: absolute;
+  /* Over the bar between the editor and the board. */
+  z-index: 2;
   top: 12px;
   right: 16px;
   max-width: min(560px, calc(100% - 32px));
@@ -451,12 +498,15 @@ select:focus-visible {
 @media (max-width: 760px) {
   .workspace {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(220px, 40%) 1fr;
+    grid-template-rows: clamp(160px, var(--editor-size, max(220px, 40%)), calc(100% - 160px)) 1px 1fr;
   }
 
-  .editor-pane {
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
+  .splitter {
+    cursor: row-resize;
+  }
+
+  .splitter::before {
+    inset: -4px 0;
   }
 
   .board-group {

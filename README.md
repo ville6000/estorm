@@ -85,6 +85,8 @@ so exported images make sense to people who don't know the notation.
 
 To present a large board, drag it to pan, zoom with Ctrl/⌘ and the wheel or
 by pinching, and click a section's name to fit that section to the view.
+**Full screen** shows the board alone; Esc leaves. Drag the line between the
+editor and the board to give either more room.
 
 **Share** copies a link that opens the board for anyone. The board is
 compressed into the link's `#` fragment, which browsers never send to a
@@ -135,7 +137,7 @@ used in more than one bounded context; see
 
 `serve` redraws the board each time you save the file in your editor. The
 page has the browser editor's board without the editor: pan and zoom, fit a
-section, the timeline view, the summary with lint warnings, and SVG or PNG
+section, full screen, the timeline view, the summary with lint warnings, and SVG or PNG
 export.
 
 To pin a version per project, use `npm install -D @villev/estorm` and run
