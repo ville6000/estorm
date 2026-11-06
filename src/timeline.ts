@@ -9,7 +9,7 @@
  * Events of a section that share a column stack, in source order.
  */
 import type { Board, Step } from './parser.ts';
-import type { Lane, Layout, Path, Point, Sticky } from './layout.ts';
+import type { Arrow, Lane, Layout, Path, Point, Sticky } from './layout.ts';
 import { GAP_Y, LANE_LABEL_H, LANE_PAD, MARGIN, STICKY_H, STICKY_W, SWIMLANE_GAP } from './layout.ts';
 import { maxOf } from './text.ts';
 
@@ -152,14 +152,14 @@ function columns(g: Graph): Map<string, number> {
  * the gap before B's column. OFFSET shifts the route so links run beside
  * arrows instead of on top of them.
  */
-function elbow(a: Sticky, b: Sticky, offset = 0): Path {
+function elbow(a: Sticky, b: Sticky, offset = 0): Arrow {
   const ay = a.y + 0.5 * a.h + offset;
   const by = b.y + 0.5 * b.h + offset;
   const start: Point = [a.x + a.w, ay];
   const end: Point = [b.x, by];
-  if (ay === by) return [start, end];
   const mx = (b.x > a.x ? b.x - 0.5 * COL_GAP : a.x + a.w + 0.5 * COL_GAP) + offset;
-  return [start, [mx, ay], [mx, by], end];
+  const points: Path = ay === by ? [start, end] : [start, [mx, ay], [mx, by], end];
+  return { points, from: a.line, to: b.line };
 }
 
 /** Lays out the timeline view of a parsed board. */
@@ -208,8 +208,8 @@ export function timeline(board: Board): Layout {
   }
 
   const at = new Map(stickies.map((s) => [s.text, s]));
-  const arrows: Path[] = [];
-  const links: Path[] = [];
+  const arrows: Arrow[] = [];
+  const links: Arrow[] = [];
   const drawn = new Set<string>();
   for (const e of g.edges) {
     const key = `${e.from}\n${e.to}`;

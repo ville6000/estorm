@@ -9,6 +9,8 @@ import { download, svgToPng } from './files.ts';
 import { fullScreen } from './fullscreen.ts';
 import { escape, summaryHtml, warningsHtml } from './html.ts';
 import * as prefs from './prefs.ts';
+import { trace } from '../src/trace.ts';
+import { showTrace } from './trace.ts';
 import { viewport } from './viewport.ts';
 
 /** What the server sends from /board: the file and the options serve was given. */
@@ -40,9 +42,17 @@ const state = {
   ast: null as Board | null,
   timeline: prefs.loadTimeline(),
   summary: '',
+  /** The line whose causes and effects the board picks out, if any. */
+  traced: null as number | null,
 };
 
 const boardLayout = (ast: Board) => (state.timeline ? timeline(ast) : layout(ast));
+
+/** Picks out the causes and effects of the step on LINE on the board; null, or a line without a step, clears it. */
+function traceLine(line: number | null): void {
+  state.traced = line;
+  showTrace(board, state.ast && line !== null ? trace(state.ast, line) : null);
+}
 
 /** Lists ERRORS above the board, or hides the list if there are none, and dims what's stale. */
 function showErrors(errors: string[]): void {
@@ -58,9 +68,10 @@ function renderBoard(): void {
   if (!served) return;
   const { board: ast, errors } = parseAll(served.text);
   showErrors(errors.map((e) => `${served.name}:${e.line}: ${e.message}`));
-  if (errors.length) return;
+  if (errors.length) return traceLine(null);
   state.ast = ast;
   boardView.show(svg(boardLayout(ast), { theme: served.theme, legend: served.legend }));
+  traceLine(state.traced);
   state.summary = summarize(ast);
   summaryBody.innerHTML = summaryHtml(state.summary);
   const warnings = lint(ast);
@@ -84,6 +95,8 @@ async function refresh(): Promise<boolean> {
     fileName.title = '';
     if (served.text === state.served?.text) return false;
     state.served = served;
+    // The file changed, so the traced line may now hold something else.
+    state.traced = null;
     fileName.textContent = served.name;
     document.title = `estorm · ${served.name}`;
     renderBoard();
@@ -114,6 +127,12 @@ async function exportBoard(format: string): Promise<void> {
 // --- page --------------------------------------------------------------------
 
 const on = (id: string, f: () => unknown) => $(id).addEventListener('click', () => void f());
+
+// Clicking a sticky traces its step; clicking elsewhere clears it.
+board.addEventListener('click', (e) => {
+  const target = (e.target as Element).closest('[data-line]');
+  traceLine(target ? Number(target.getAttribute('data-line')) : null);
+});
 
 on('zoom-in', () => boardView.step(1));
 on('zoom-out', () => boardView.step(-1));

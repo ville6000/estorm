@@ -73,8 +73,10 @@ describe('layout', () => {
     it('pushes the next row, and the arrow to it, below the tall policy', () => {
       const next = find(stickies, 'whenever TicketClosed');
       expect(next.y).toBeGreaterThan(policy.y + policy.h);
-      const branch = arrows.find((a) => a.at(-1)![0] === next.x + 0.5 * next.w && a.at(-1)![1] === next.y)!;
-      expect(branch[1]![1]).toBeGreaterThan(policy.y + policy.h);
+      const branch = arrows.find(
+        (a) => a.points.at(-1)![0] === next.x + 0.5 * next.w && a.points.at(-1)![1] === next.y,
+      )!;
+      expect(branch.points[1]![1]).toBeGreaterThan(policy.y + policy.h);
     });
   });
 
@@ -118,8 +120,8 @@ describe('layout', () => {
 
     it('routes reaction arrows below the tall aggregate', () => {
       const agg = find(stickies, 'Booking', 'aggregate');
-      const branch = arrows.find((a) => a.length > 2)!;
-      expect(branch[1]![1]).toBeGreaterThan(agg.y + agg.h);
+      const branch = arrows.find((a) => a.points.length > 2)!;
+      expect(branch.points[1]![1]).toBeGreaterThan(agg.y + agg.h);
     });
 
     it('keeps aggregates without rules plain', () => {
@@ -219,7 +221,7 @@ describe('layout', () => {
     });
 
     it('ends a link on top of its policy', () => {
-      const [x, y] = links[0]!.at(-1)!;
+      const [x, y] = links[0]!.points.at(-1)!;
       expect(y).toBe(p1.y);
       expect(x).toBeGreaterThan(p1.x);
       expect(x).toBeLessThan(right(p1));
@@ -247,9 +249,9 @@ describe('layout', () => {
     it('forks an arrow from the aggregate to each', () => {
       const agg = find(stickies, 'Agg');
       for (const e of [done!, failed!, lost!]) {
-        const into = arrows.filter((a) => a.at(-1)![0] === e.x && a.at(-1)![1] === e.y + e.h / 2);
+        const into = arrows.filter((a) => a.points.at(-1)![0] === e.x && a.points.at(-1)![1] === e.y + e.h / 2);
         expect(into).toHaveLength(1);
-        expect(into[0]![0]).toEqual([right(agg), agg.y + agg.h / 2]);
+        expect(into[0]!.points[0]).toEqual([right(agg), agg.y + agg.h / 2]);
       }
     });
 
@@ -263,8 +265,8 @@ describe('layout', () => {
 
     it('leads links from stacked events beside the stack, under it', () => {
       for (const l of links) {
-        const [x0] = l[0]!;
-        const [x1, y1] = l[2]!;
+        const [x0] = l.points[0]!;
+        const [x1, y1] = l.points[2]!;
         expect(x0).toBe(right(done!));
         expect(x1).toBeGreaterThan(right(done!));
         expect(y1).toBeGreaterThan(bottom);
@@ -274,12 +276,12 @@ describe('layout', () => {
 
   it('keeps a link that dips below the last row on the board', () => {
     const { height, links } = board('== A ==', 'X: Do -> Done', '== B ==', 'when Done', '  then B -> BDone');
-    expect(links.flat().every(([, y]) => y < height)).toBe(true);
+    expect(links.flatMap((l) => l.points).every(([, y]) => y < height)).toBe(true);
   });
 
   it('keeps link rails inside the board', () => {
     const { width, links } = board('== A ==', 'when Done', '  then B -> BDone', '== B ==', 'X: Do -> Done');
-    expect(links.flat().every(([x]) => x >= 0 && x <= width)).toBe(true);
+    expect(links.flatMap((l) => l.points).every(([x]) => x >= 0 && x <= width)).toBe(true);
   });
 
   describe('time triggers', () => {
@@ -299,7 +301,7 @@ describe('layout', () => {
 
     it('links the unless event into the policy', () => {
       expect(cancels).toHaveLength(1);
-      expect(cancels[0]!.at(-1)![1]).toBe(policy.y);
+      expect(cancels[0]!.points.at(-1)![1]).toBe(policy.y);
       expect(arrows).toHaveLength(4);
     });
 
@@ -375,7 +377,7 @@ describe('across lanes', () => {
     it('draws one policy, linked from each event', () => {
       expect(stickies.filter((s) => s.kind === 'policy')).toEqual([policy]);
       expect(links).toHaveLength(3);
-      expect(links.every((l) => l.at(-1)![1] === policy.y)).toBe(true);
+      expect(links.every((l) => l.points.at(-1)![1] === policy.y)).toBe(true);
     });
 
     it('starts right of the latest event', () => {
@@ -416,7 +418,7 @@ describe('across lanes', () => {
       const l = layout(parse(readFileSync(`examples/${f}`, 'utf8')));
       const pairs = l.stickies.flatMap((a, i) => l.stickies.slice(i + 1).filter((b) => overlap(a, b)));
       expect(pairs).toEqual([]);
-      for (const path of [...l.links, ...l.cancels]) {
+      for (const { points: path } of [...l.links, ...l.cancels]) {
         for (let i = 1; i < path.length; i++) {
           expect(l.stickies.filter((s) => through(path[i - 1]!, path[i]!, s))).toEqual([]);
         }

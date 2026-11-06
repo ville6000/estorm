@@ -25,6 +25,7 @@ estorm is a small pipeline. Each step is a pure function in its own file:
 | `src/svg.ts`       | layout to an SVG string                                                                              |
 | `src/summary.ts`   | AST to a Markdown overview: dependencies, gaps, hotspots                                             |
 | `src/lint.ts`      | AST to warnings: event tense, aggregates shared by contexts                                          |
+| `src/trace.ts`     | AST and a line to the step there, what led to it and what it leads to, for the browser editor        |
 | `src/hints.ts`     | how to fix each error and warning, by code, for `--format json`                                      |
 | `src/index.ts`     | public API: `parse`, `parseAll`, `layout`, `svg`, `render`, `summarize`, `lint`                      |
 | `src/highlight.ts` | one line to tokens, for the editor and the language server                                           |

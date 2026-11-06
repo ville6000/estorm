@@ -44,6 +44,13 @@ export interface Sticky {
 export type Point = [number, number];
 export type Path = Point[];
 
+/** A path from one sticky to another, and the source lines of the steps they belong to. */
+export interface Arrow {
+  points: Path;
+  from: number;
+  to: number;
+}
+
 export interface Lane {
   name: string;
   line: number;
@@ -65,11 +72,11 @@ export interface Layout {
   height: number;
   stickies: Sticky[];
   /** Arrows within a row, and from an event to its reactions. */
-  arrows: Path[];
+  arrows: Arrow[];
   /** From an event to the policies of each 'when' that names it. */
-  links: Path[];
+  links: Arrow[];
   /** From the 'unless' event of an 'after' to the policies it cancels. */
-  cancels: Path[];
+  cancels: Arrow[];
   /** Named sections, as full-height bands. */
   lanes: Lane[];
   /** The areas drawn on the board's background: one per lane, with nothing between them. */
@@ -91,23 +98,26 @@ function addBottoms(bottoms: Bottoms, stickies: Sticky[]): void {
   for (const s of stickies) bottoms.set(s.y, Math.max(bottoms.get(s.y) ?? -Infinity, s.y + s.h));
 }
 
+/** POINTS as an arrow from sticky A to sticky B. */
+const joining = (a: Sticky, b: Sticky, points: Path): Arrow => ({ points, from: a.line, to: b.line });
+
 /** Arrow from the right side of A to the left side of B: straight, or forking down to a stacked event. */
-function arrow(a: Sticky, b: Sticky): Path {
+function arrow(a: Sticky, b: Sticky): Arrow {
   const ay = a.y + 0.5 * STICKY_H;
   const by = b.y + 0.5 * STICKY_H;
   if (ay === by) {
-    return [
+    return joining(a, b, [
       [a.x + a.w, ay],
       [b.x, ay],
-    ];
+    ]);
   }
   const mx = b.x - 0.5 * GAP_X;
-  return [
+  return joining(a, b, [
     [a.x + a.w, ay],
     [mx, ay],
     [mx, by],
     [b.x, by],
-  ];
+  ]);
 }
 
 /**
@@ -127,7 +137,7 @@ function branch(
   offset = 0,
   clear?: Clear,
   side = false,
-): Path {
+): Arrow {
   const midX = e.x + 0.5 * STICKY_W + 2 * offset;
   const below = bottom + 0.5 * GAP_Y + offset;
   const sideX = e.x + e.w + 0.5 * GAP_X + offset;
@@ -145,13 +155,13 @@ function branch(
   const px = policy.x + 0.5 * STICKY_W + 2 * offset;
   const preferred = groupX - 0.5 * GAP_X - offset;
   const rail = clear ? clear(preferred, Math.min(below, above), Math.max(below, above)) : preferred;
-  return [
+  return joining(e, policy, [
     ...out,
     ...(below === above
       ? [[px, below] as Point]
       : [[rail, below] as Point, [rail, above] as Point, [px, above] as Point]),
     [px, policy.y],
-  ];
+  ]);
 }
 
 /** What a reaction reacts to. */
@@ -213,7 +223,7 @@ function rowXYs(kinds: Kind[], x0: number, y0: number): Point[] {
 }
 
 /** Arrows between the stickies of a row, from the command on, forking to each event. */
-function flowArrows(placed: Sticky[]): Path[] {
+function flowArrows(placed: Sticky[]): Arrow[] {
   const from = placed.slice(placed.findIndex((s) => !GROUP_KINDS.has(s.kind)));
   const first = from.findIndex((s) => s.kind === 'event');
   return [
@@ -241,7 +251,7 @@ interface LaneBoard {
   stickies: Sticky[];
   /** Of STICKIES; add them with addStickies to keep it current. */
   bottoms: Bottoms;
-  arrows: Path[];
+  arrows: Arrow[];
   pendingLinks: PendingLink[];
   /** Swimlanes only: where the last top-level item starts; the next starts no further left. */
   minX: number;
@@ -439,7 +449,7 @@ function shift(dx: number, dy: number, lane: LaneBoard): LaneBoard {
   return {
     ...lane,
     stickies: lane.stickies.map(move),
-    arrows: lane.arrows.map((path) => path.map(([x, y]): Point => [x + dx, y + dy])),
+    arrows: lane.arrows.map((a) => ({ ...a, points: a.points.map(([x, y]): Point => [x + dx, y + dy]) })),
     pendingLinks: lane.pendingLinks.map((l) => ({ ...l, policy: move(l.policy), groupX: l.groupX + dx })),
   };
 }
@@ -517,7 +527,7 @@ function link(
   stacked: Set<Sticky>,
   { event, policy, groupX, kind }: PendingLink,
   clear: Clear,
-): Path {
+): Arrow {
   const e = events.get(event)!;
   return branch(e, bottoms.get(e.y)!, policy, groupX, kind === 'cancel' ? -6 : 6, clear, stacked.has(e));
 }
@@ -543,19 +553,24 @@ function connect(placed: LaneBoard[]): Pick<Layout, 'stickies' | 'arrows' | 'lin
 
 /** The bottom of everything in PARTS. */
 function bottomOf({ stickies, arrows, links, cancels }: Pick<Layout, 'stickies' | 'arrows' | 'links' | 'cancels'>) {
-  return maxOf([...stickies.map((s) => s.y + s.h), ...[...arrows, ...links, ...cancels].flat().map(([, y]) => y)], 0);
+  const points = [...arrows, ...links, ...cancels].flatMap((a) => a.points);
+  return maxOf([...stickies.map((s) => s.y + s.h), ...points.map(([, y]) => y)], 0);
 }
 
 /** Lanes placed as bands stacked top to bottom, on one time axis. */
 function swimlanes(lanes: LaneBoard[]): Layout {
   const bandHs = lanes.map(
-    (l) => maxOf([...l.stickies.map((s) => s.y + s.h), ...l.arrows.flat().map(([, y]) => y)], 0) + GAP_Y,
+    (l) =>
+      maxOf([...l.stickies.map((s) => s.y + s.h), ...l.arrows.flatMap((a) => a.points).map(([, y]) => y)], 0) + GAP_Y,
   );
   const bandYs = bandHs.reduce<number[]>((ys, h) => [...ys, ys.at(-1)! + h + SWIMLANE_GAP], [0]);
   const parts = connect(lanes.map((l, i) => shift(LANE_PAD, bandYs[i]!, l)));
   const width = parts.stickies.length
     ? LANE_PAD +
-      maxOf([...parts.stickies.map((s) => s.x + s.w), ...[...parts.links, ...parts.cancels].flat().map(([x]) => x)])
+      maxOf([
+        ...parts.stickies.map((s) => s.x + s.w),
+        ...[...parts.links, ...parts.cancels].flatMap((a) => a.points).map(([x]) => x),
+      ])
     : 0;
   const height = Math.max(bandHs.length ? bandYs.at(-1)! - SWIMLANE_GAP : 0, MARGIN + bottomOf(parts));
   return {

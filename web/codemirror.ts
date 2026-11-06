@@ -92,8 +92,14 @@ const highlighter = ViewPlugin.fromClass(
 const vimMode = new Compartment();
 const vimKeys = (on: boolean) => (on ? vim({ status: true }) : []);
 
-/** An editor state for TEXT, calling ON_CHANGE whenever the text changes. */
-export function createState(text: string, { vim, onChange }: { vim: boolean; onChange: () => void }): EditorState {
+/**
+ * An editor state for TEXT, calling ON_CHANGE whenever the text changes, and
+ * ON_CURSOR with the cursor's line number when it moves without a change.
+ */
+export function createState(
+  text: string,
+  { vim, onChange, onCursor }: { vim: boolean; onChange: () => void; onCursor: (line: number) => void },
+): EditorState {
   return EditorState.create({
     doc: text,
     extensions: [
@@ -126,6 +132,7 @@ export function createState(text: string, { vim, onChange }: { vim: boolean; onC
       }),
       EditorView.updateListener.of((u) => {
         if (u.docChanged) onChange();
+        else if (u.selectionSet) onCursor(u.state.doc.lineAt(u.state.selection.main.head).number);
       }),
     ],
   });

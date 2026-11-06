@@ -1,6 +1,6 @@
 /** Renders a layout (see layout.ts) as a standalone SVG document. */
 import { LANE_LABEL_H, LANE_PAD } from './layout.ts';
-import type { Kind, Lane, Layout, Path, Sticky } from './layout.ts';
+import type { Arrow, Kind, Lane, Layout, Path, Sticky } from './layout.ts';
 import {
   BULLET_W,
   FONT_SIZE,
@@ -202,9 +202,18 @@ function pathD(points: Path): string {
   return 'M' + points.map(([x, y]) => `${x} ${y}`).join(' L');
 }
 
-function arrow(points: Path, p: Palette, id: string): string {
+/**
+ * Attributes naming the source lines of the steps an arrow joins, so editors
+ * can pick out its ends, as data-line does for stickies. Legend samples have none.
+ */
+function ends(a?: Arrow): Attrs {
+  return { 'data-from': a?.from, 'data-to': a?.to };
+}
+
+function arrow(points: Path, p: Palette, id: string, a?: Arrow): string {
   return el('path', {
     class: 'arrow',
+    ...ends(a),
     d: pathD(points),
     fill: 'none',
     stroke: p.arrow,
@@ -214,9 +223,10 @@ function arrow(points: Path, p: Palette, id: string): string {
 }
 
 /** Arrow of a 'when' reaction, dashed: it may cross a lane boundary. */
-function link(points: Path, p: Palette, id: string): string {
+function link(points: Path, p: Palette, id: string, a?: Arrow): string {
   return el('path', {
     class: 'link',
+    ...ends(a),
     d: pathD(points),
     fill: 'none',
     stroke: p.link,
@@ -227,9 +237,10 @@ function link(points: Path, p: Palette, id: string): string {
 }
 
 /** Arrow from the 'unless' event of an 'after' into the delayed policy: dotted red, it cancels the timer. */
-function cancel(points: Path, p: Palette, id: string): string {
+function cancel(points: Path, p: Palette, id: string, a?: Arrow): string {
   return el('path', {
     class: 'cancel',
+    ...ends(a),
     d: pathD(points),
     fill: 'none',
     stroke: p.cancel,
@@ -390,9 +401,9 @@ export function svg(layout: Layout, { theme = 'light', legend: withLegend = true
           el('rect', { class: 'background', x, y, width: w, height: h, fill: p.background }),
         ),
         ...lanes.map((l) => lane(l, p)),
-        ...arrows.map((a) => arrow(a, p, id)),
-        ...links.map((l) => link(l, p, id)),
-        ...cancels.map((c) => cancel(c, p, id)),
+        ...arrows.map((a) => arrow(a.points, p, id, a)),
+        ...links.map((l) => link(l.points, p, id, l)),
+        ...cancels.map((c) => cancel(c.points, p, id, c)),
         ...stickies.map((s) => sticky(s, id)),
       ]),
     ],

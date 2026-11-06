@@ -84,7 +84,7 @@ describe('a big board', () => {
   });
 
   it('has no links through stickies', () => {
-    const crossed = [...l.links, ...l.cancels].flatMap((path) =>
+    const crossed = [...l.links, ...l.cancels].flatMap(({ points: path }) =>
       path.slice(1).flatMap(([bx, by], i) => {
         const [ax, ay] = path[i]!;
         return l.stickies

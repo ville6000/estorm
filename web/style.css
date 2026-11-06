@@ -431,11 +431,6 @@ select:focus-visible {
   white-space: pre-wrap;
 }
 
-.viewer .board svg g[data-line],
-.board-only .board svg g[data-line] {
-  cursor: inherit;
-}
-
 .viewer #warnings button,
 .board-only #warnings button {
   cursor: text;
@@ -475,6 +470,24 @@ select:focus-visible {
 
 .board svg g[data-line] {
   cursor: pointer;
+}
+
+/* A trace (trace.ts): a step, what led to it and what it leads to stay; the rest fades. */
+.board.tracing svg g[data-line]:not(.lane):not(.traced),
+.board.tracing svg path[data-from]:not(.traced) {
+  opacity: 0.2;
+}
+
+.board svg g.focus > rect {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .board svg g[data-line],
+  .board svg path[data-from] {
+    transition: opacity 0.15s;
+  }
 }
 
 .panel {

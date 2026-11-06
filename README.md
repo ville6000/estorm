@@ -88,6 +88,12 @@ the list and Ctrl+Space (⌥I on a Mac) opens it.
 A legend above the board names the sticky colours and arrow styles it uses,
 so exported images make sense to people who don't know the notation.
 
+To follow a flow across a large board, click a line in the editor, or a
+sticky on the board. The board then shows only that step, what led to it
+and what it leads to, across sections and through `when` and `after`, and
+fades the rest. Typing, or clicking an empty part of the board, shows
+everything again.
+
 To present a large board, drag it to pan, zoom with Ctrl/⌘ and the wheel or
 by pinching, and click a section's name to fit that section to the view.
 **Full screen** shows the board alone; Esc leaves. Drag the line between the
@@ -147,8 +153,8 @@ the same across releases and a hint on how to fix it; see
 
 `serve` redraws the board each time you save the file in your editor. The
 page has the browser editor's board without the editor: pan and zoom, fit a
-section, full screen, the timeline view, the summary with lint warnings, and SVG or PNG
-export.
+section, click a sticky to see its causes and effects, full screen, the
+timeline view, the summary with lint warnings, and SVG or PNG export.
 
 To pin a version per project, use `npm install -D @villev/estorm` and run
 `npx estorm`. Running `npx @villev/estorm` without installing also works,

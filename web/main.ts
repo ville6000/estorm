@@ -5,8 +5,9 @@
  * This file holds the app's state and wires the page to it; the parts live in
  * codemirror.ts (the source editor), files.ts (open, save, export), html.ts
  * (panel contents), viewport.ts (the board's pane: zoom, fit, pan.ts gestures),
- * split.ts (resizing the editor), fullscreen.ts (the board alone), prefs.ts
- * (local storage) and share.ts (links).
+ * split.ts (resizing the editor), fullscreen.ts (the board alone), trace.ts
+ * (picking out a step's causes and effects), prefs.ts (local storage) and
+ * share.ts (links).
  */
 import { EditorView } from '@codemirror/view';
 import {
@@ -21,6 +22,7 @@ import {
   type Board,
   type Layout,
 } from '../src/index.ts';
+import { trace } from '../src/trace.ts';
 import { createState, goToLine, setErrorLines, setVimKeys, Vim } from './codemirror.ts';
 import { canPick, download, type FileHandle, pickFile, pickSaveFile, svgToPng, writeTo } from './files.ts';
 import { copies } from './copy.ts';
@@ -29,6 +31,7 @@ import { errorsHtml, summaryHtml, warningsHtml } from './html.ts';
 import * as prefs from './prefs.ts';
 import { decode, encode } from './share.ts';
 import { splitter } from './split.ts';
+import { showTrace } from './trace.ts';
 import { viewport } from './viewport.ts';
 
 // Where links from the downloaded file point, since file:// links don't work for others.
@@ -64,6 +67,10 @@ const state = {
   vim: prefs.loadVim(),
   timeline: prefs.loadTimeline(),
   summary: '',
+  /** The board on screen, or null while the source has errors and the board is stale. */
+  ast: null as Board | null,
+  /** The line whose causes and effects the board picks out, if any. */
+  traced: null as number | null,
 };
 
 const view = new EditorView({ parent: $('source') });
@@ -86,6 +93,12 @@ function boardLayout(ast: Board): Layout {
   return state.timeline ? timeline(ast) : layout(ast);
 }
 
+/** Picks out the causes and effects of the step on LINE on the board; null, or a line without a step, clears it. */
+function traceLine(line: number | null): void {
+  state.traced = line;
+  showTrace(board, state.ast && line !== null ? trace(state.ast, line) : null);
+}
+
 /** Draws the board, or lists the errors and leaves the last board dimmed. */
 function renderBoard(): void {
   const text = sourceText();
@@ -94,6 +107,7 @@ function renderBoard(): void {
   errorList.hidden = !errors.length;
   board.classList.toggle('stale', errors.length > 0);
   summaryPanel.classList.toggle('stale', errors.length > 0);
+  state.ast = errors.length ? null : ast;
   if (!errors.length) {
     boardView.show(svg(boardLayout(ast), { theme: 'auto' }));
     state.summary = summarize(ast);
@@ -102,6 +116,7 @@ function renderBoard(): void {
     warningList.innerHTML = warningsHtml(warnings);
     summaryButton.textContent = warnings.length ? `Summary (${warnings.length})` : 'Summary';
   }
+  traceLine(state.traced);
   view.dispatch({ effects: setErrorLines.of(errors.map((e) => e.line)) });
   fileName.textContent = state.name;
   fileName.classList.toggle('dirty', text !== state.saved);
@@ -118,7 +133,13 @@ function scheduleRender(): void {
 
 /** Replaces the source with TEXT, as file NAME; SAVED is what's on disk, to tell if there are changes. */
 function load(text: string, name: string, handle: FileHandle | null, saved = text): void {
-  view.setState(createState(text, { vim: state.vim, onChange: scheduleRender }));
+  // Typing clears the trace: the board is about to change under it.
+  const onChange = () => {
+    traceLine(null);
+    scheduleRender();
+  };
+  view.setState(createState(text, { vim: state.vim, onChange, onCursor: traceLine }));
+  state.traced = null;
   state.name = name;
   state.handle = handle;
   state.saved = saved;
@@ -235,7 +256,13 @@ function setTimeline(timeline: boolean): void {
   prefs.saveTimeline(timeline);
 }
 
-jumpsToLines(board);
+// A sticky jumps to its line, and so traces it; with the editor hidden it is traced directly. Elsewhere clears.
+board.addEventListener('click', (e) => {
+  const target = (e.target as Element).closest('[data-line]');
+  const line = target ? Number(target.getAttribute('data-line')) : null;
+  if (line === null || boardOnly.active()) traceLine(line);
+  else goToLine(view, line);
+});
 jumpsToLines(warningList);
 jumpsToLines(errorList);
 

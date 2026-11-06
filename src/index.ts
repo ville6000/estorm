@@ -17,7 +17,7 @@ import type { SvgOptions } from './svg.ts';
 export { parse, parseAll, ParseError } from './parser.ts';
 export type * from './parser.ts';
 export { layout } from './layout.ts';
-export type { Kind, Lane, Layout, Path, Point, Rect, Sticky } from './layout.ts';
+export type { Arrow, Kind, Lane, Layout, Path, Point, Rect, Sticky } from './layout.ts';
 export { timeline } from './timeline.ts';
 export { svg, COLORS } from './svg.ts';
 export type { SvgOptions, Theme } from './svg.ts';
