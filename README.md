@@ -45,6 +45,7 @@ Text fits what comes after the workshop:
 | Render, check or lint boards from the terminal | [Command line](#command-line)     | `npm install -g`, Node.js 22+ |
 | Write boards in VS Code                        | [Editor support](#editor-support) | The VS Code extension         |
 | Write boards in Neovim or another LSP editor   | [Editor support](#editor-support) | The command line              |
+| Have an AI agent write or transcribe boards    | [AI agents](#ai-agents)           | The Claude Code plugin        |
 | Render boards in CI                            | [Docker and CI](#docker-and-ci)   | Docker                        |
 | Render boards from JavaScript or TypeScript    | [Library](#library)               | `npm install`                 |
 
@@ -130,14 +131,19 @@ estorm render board.estorm --theme auto   # dark when the viewer's is (also: lig
 estorm render board.estorm --no-legend     # without the key to sticky colours and arrows
 estorm check docs/*.estorm        # errors only, for CI
 estorm lint docs/*.estorm         # errors and modelling warnings
+estorm lint --format json docs/*.estorm   # the same as JSON, with codes and hints
 estorm summary board.estorm       # actors, aggregates, gaps, hotspots
 estorm serve board.estorm         # live preview at http://localhost:8080
+estorm guide                      # how to write boards, for AI agents
 ```
 
 Errors are reported as `file:line: message`, and the exit code is non-zero.
 `lint` also warns about events not named in the past tense and aggregates
 used in more than one bounded context; see
-[GRAMMAR.md](GRAMMAR.md#warnings).
+[GRAMMAR.md](GRAMMAR.md#warnings). With `--format json`, `check` and `lint`
+print one JSON array on stdout instead, each problem with a code that stays
+the same across releases and a hint on how to fix it; see
+[GRAMMAR.md](GRAMMAR.md#errors).
 
 `serve` redraws the board each time you save the file in your editor. The
 page has the browser editor's board without the editor: pan and zoom, fit a
@@ -163,6 +169,44 @@ preview of the board; nothing else to install.
 **Other editors:** install the [command line](#command-line); it includes the
 language server, `estorm lsp`, for any editor that speaks LSP. Setup for
 Neovim is in [EDITORS.md](EDITORS.md).
+
+## AI agents
+
+For having an AI agent write or refine a board, or transcribe a photo of a
+workshop wall.
+
+`estorm guide` prints a short guide to the notation written for AI models:
+the rules they get wrong most often, worked examples, and how to transcribe
+a workshop without "improving" on it. `check` and `lint` with
+`--format json` give every problem a code and a hint on how to fix it, so
+an agent can write, check and fix a board on its own.
+
+**Claude Code:** install the plugin. Its skill tells Claude when and how to
+use estorm:
+
+```
+/plugin install estorm --marketplace ville6000/estorm
+```
+
+Before Claude Code 2.1.275, run `/plugin marketplace add ville6000/estorm`
+and then `/plugin install estorm@estorm`.
+
+**Other coding agents:** add this to your project's `AGENTS.md`, or to the
+agent's own instructions file:
+
+```md
+Event Storming boards are `.estorm` files in `docs/`. Before writing or
+editing one, run `npx @villev/estorm guide` and follow it. After editing,
+run `npx @villev/estorm lint --format json <file>` and fix every error.
+```
+
+The plugin's skill, [SKILL.md](plugins/estorm/skills/estorm/SKILL.md), is
+a plain Agent Skill, so agents that load skills can use it as it is.
+
+**Chat assistants:** an assistant without a shell can read
+<https://ville6000.github.io/estorm/llms-full.txt>, the guide and the full
+grammar in one file. Paste the board it writes into the
+[browser editor](#browser-editor) to check and render it.
 
 ## Docker and CI
 

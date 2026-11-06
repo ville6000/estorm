@@ -99,6 +99,66 @@ describe('cli', () => {
     );
   });
 
+  it('reports errors as JSON on stdout, with codes and hints', () => {
+    const file = fixture('A: Do -> Done\n  then Oops');
+    const { status, stdout, stderr } = run('check', '--format', 'json', file);
+    expect(status).toBe(1);
+    expect(stderr).toBe('');
+    expect(JSON.parse(stdout)).toEqual([
+      {
+        file,
+        line: 2,
+        severity: 'error',
+        code: 'chain-without-event',
+        message: 'chain must end with an event',
+        hint: expect.stringContaining('then Send receipt -> [Email] -> ReceiptSent'),
+      },
+    ]);
+  });
+
+  it('lints as JSON: errors and warnings across files, by line within each', () => {
+    const [warned, broken] = [fixture('A: Do -> Doing\nB: ->'), fixture('C: Go -> (Oops)')];
+    const { status, stdout } = run('lint', '--format', 'json', warned, broken);
+    expect(status).toBe(1);
+    expect(JSON.parse(stdout).map((d: Record<string, unknown>) => [d.file, d.line, d.severity, d.code])).toEqual([
+      [warned, 1, 'warning', 'past-tense'],
+      [warned, 2, 'error', 'empty-chain-item'],
+      [broken, 1, 'error', 'chain-without-event'],
+    ]);
+  });
+
+  it('prints an empty JSON array for clean boards', () => {
+    const { status, stdout } = run('lint', '--format', 'json', fixture('A: Do -> Done'));
+    expect(status).toBe(0);
+    expect(JSON.parse(stdout)).toEqual([]);
+  });
+
+  it('reports unreadable files in JSON without a line', () => {
+    const { status, stdout } = run('check', '--format', 'json', 'nope.estorm');
+    expect(status).toBe(1);
+    expect(JSON.parse(stdout)).toEqual([
+      { file: 'nope.estorm', severity: 'error', code: 'unreadable', message: 'no such file' },
+    ]);
+  });
+
+  it('rejects unknown formats, and --format outside check and lint', () => {
+    const file = fixture('A: Do -> Done');
+    expect(run('check', '--format', 'xml', file)).toMatchObject({
+      status: 2,
+      stderr: expect.stringContaining('invalid format: xml'),
+    });
+    expect(run('render', '--format', 'json', file)).toMatchObject({
+      status: 2,
+      stderr: expect.stringContaining('--format works with check and lint only'),
+    });
+  });
+
+  it('prints the guide', () => {
+    const { status, stdout } = run('guide');
+    expect(status).toBe(0);
+    expect(stdout).toBe(readFileSync('GUIDE.md', 'utf8'));
+  });
+
   it('summarises to stdout', () => {
     const { status, stdout } = run('summary', fixture('A: Do -> Done'));
     expect(status).toBe(0);

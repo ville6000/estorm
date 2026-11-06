@@ -4,9 +4,13 @@
  */
 import type { Board, Step, Via } from './parser.ts';
 
+/** What kind of warning it is: stable across releases, like ErrorCode. */
+export type WarningCode = 'past-tense' | 'shared-aggregate';
+
 export interface Warning {
   line: number;
   message: string;
+  code: WarningCode;
 }
 
 /** Past participles that don't end in "ed". */
@@ -47,7 +51,9 @@ export function lint(board: Board): Warning[] {
   const event = (name: string, line: number) => {
     if (events.has(name)) return;
     events.add(name);
-    if (!isPastTense(name)) warnings.push({ line, message: `event should be in the past tense: ${name}` });
+    if (!isPastTense(name)) {
+      warnings.push({ line, message: `event should be in the past tense: ${name}`, code: 'past-tense' });
+    }
   };
   const via = (list: Via[], line: number) => {
     if (section === undefined) return;
@@ -93,6 +99,7 @@ export function lint(board: Board): Warning[] {
     warnings.push({
       line: [...sections.values()][1]!,
       message: `aggregate ${name} is used in several contexts: ${[...sections.keys()].join(', ')}`,
+      code: 'shared-aggregate',
     });
   }
   return warnings.sort((a, b) => a.line - b.line);

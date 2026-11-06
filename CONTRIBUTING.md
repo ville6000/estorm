@@ -25,12 +25,15 @@ estorm is a small pipeline. Each step is a pure function in its own file:
 | `src/svg.ts`       | layout to an SVG string                                                                              |
 | `src/summary.ts`   | AST to a Markdown overview: dependencies, gaps, hotspots                                             |
 | `src/lint.ts`      | AST to warnings: event tense, aggregates shared by contexts                                          |
+| `src/hints.ts`     | how to fix each error and warning, by code, for `--format json`                                      |
 | `src/index.ts`     | public API: `parse`, `parseAll`, `layout`, `svg`, `render`, `summarize`, `lint`                      |
 | `src/highlight.ts` | one line to tokens, for the editor and the language server                                           |
 | `src/lsp.ts`       | `estorm lsp`: language server over stdio                                                             |
-| `src/cli.ts`       | `estorm render / check / lint / summary / serve / lsp`                                               |
+| `src/cli.ts`       | `estorm render / check / lint / summary / serve / guide / lsp`                                       |
 | `web/`             | the browser editor, built into one file, `estorm.html`, and the `serve` page, `preview.html`         |
 | `examples/`        | example boards and their rendered SVGs                                                               |
+| `GUIDE.md`         | the guide `estorm guide` prints, for AI agents; its examples are tested                              |
+| `plugins/estorm/`  | the Claude Code plugin and its skill, listed by `.claude-plugin/marketplace.json`                    |
 
 The source runs directly on Node.js (type stripping), so there is no build
 step while developing: `npm run estorm -- render board.estorm`. Keep to
@@ -54,9 +57,14 @@ issue with:
 A notation change then needs, in the same pull request:
 
 1. GRAMMAR.md updated: the statement, the EBNF, the AST and any new errors.
+   Each new error gets a code in `ErrorCode` and a hint in `src/hints.ts`.
+   Codes are for tools to match on, so never rename or reuse one.
 2. Parser tests for the new syntax and each new error message.
 3. Layout tests if it changes placement.
 4. If it is worth showing, an example in `examples/`.
+5. GUIDE.md updated if it changes how boards are written, or adds a common
+   mistake. Its `estorm` blocks must check clean, and each `text` block
+   must fail with the code named just before it.
 
 ## Visual changes
 

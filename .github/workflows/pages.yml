@@ -34,11 +34,14 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run build
+      # llms.txt points AI models at llms-full.txt: the guide, then the grammar.
       - name: Prepare site
         run: |
           mkdir -p site
           cp dist/web/estorm.html site/index.html
           cp dist/web/estorm.html site/estorm.html
+          cp web/llms.txt site/llms.txt
+          { cat GUIDE.md; echo; cat GRAMMAR.md; } > site/llms-full.txt
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

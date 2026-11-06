@@ -31,14 +31,14 @@ describe('html', () => {
   });
 
   it('lists errors as buttons that jump to their lines', () => {
-    expect(errorsHtml([new ParseError(3, 'bad <thing>')])).toBe(
+    expect(errorsHtml([new ParseError(3, 'bad <thing>', 'unrecognised-line')])).toBe(
       '<button type="button" data-line="3">line 3: bad &#60;thing&#62;</button>',
     );
     expect(errorsHtml([])).toBe('');
   });
 
   it('lists warnings under a heading, or nothing without any', () => {
-    expect(warningsHtml([{ line: 2, message: 'w' }])).toBe(
+    expect(warningsHtml([{ line: 2, message: 'w', code: 'past-tense' }])).toBe(
       '<h3>Warnings (1)</h3><ul><li><button type="button" data-line="2">line 2: w</button></li></ul>',
     );
     expect(warningsHtml([])).toBe('');

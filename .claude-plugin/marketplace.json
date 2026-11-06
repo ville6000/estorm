@@ -1,0 +1,12 @@
+{
+  "name": "estorm",
+  "owner": { "name": "Ville Viklund" },
+  "description": "Event Storming boards as plain text, for Claude Code.",
+  "plugins": [
+    {
+      "name": "estorm",
+      "source": "./plugins/estorm",
+      "description": "Write, check and render Event Storming boards in estorm's plain-text notation, and transcribe photos of workshop walls into them."
+    }
+  ]
+}

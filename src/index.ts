@@ -24,7 +24,7 @@ export type { SvgOptions, Theme } from './svg.ts';
 export { wrap } from './text.ts';
 export { summarize } from './summary.ts';
 export { lint } from './lint.ts';
-export type { Warning } from './lint.ts';
+export type { Warning, WarningCode } from './lint.ts';
 
 /** Renders estorm text to a standalone SVG document. Throws ParseError. */
 export function render(text: string, options?: SvgOptions): string {

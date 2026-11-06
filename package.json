@@ -38,6 +38,7 @@
     "dist",
     "!dist/web/estorm.html",
     "GRAMMAR.md",
+    "GUIDE.md",
     "EDITORS.md"
   ],
   "engines": {

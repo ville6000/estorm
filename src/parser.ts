@@ -100,18 +100,52 @@ export type Step = Reaction | After;
 export type TopLevel = Flow | Event | When | Section | Hotspot;
 export type Board = TopLevel[];
 
+/**
+ * What kind of error a ParseError is: stable across releases, unlike the
+ * message, so tools and AI agents can act on it. GRAMMAR.md lists them.
+ */
+export type ErrorCode =
+  | 'unrecognised-line'
+  | 'invalid-actor'
+  | 'empty-hotspot'
+  | 'empty-rule'
+  | 'empty-section'
+  | 'tab-indent'
+  | 'odd-indent'
+  | 'indented-top-level'
+  | 'no-parent'
+  | 'indent-too-deep'
+  | 'chain-without-event'
+  | 'expected-command'
+  | 'expected-aggregate-or-external'
+  | 'empty-chain-item'
+  | 'empty-event-name'
+  | 'duplicate-event'
+  | 'invalid-chain-item'
+  | 'dangling-read-model'
+  | 'misplaced-rule'
+  | 'rule-without-aggregate'
+  | 'ambiguous-rule'
+  | 'misplaced-hotspot'
+  | 'reaction-after-several-events'
+  | 'no-reactions'
+  | 'expected-event-name'
+  | 'unknown-event';
+
 export class ParseError extends Error {
   readonly line: number;
+  readonly code: ErrorCode;
 
-  constructor(line: number, message: string) {
+  constructor(line: number, message: string, code: ErrorCode) {
     super(message);
     this.name = 'ParseError';
     this.line = line;
+    this.code = code;
   }
 }
 
-function fail(line: number, message: string): never {
-  throw new ParseError(line, message);
+function fail(line: number, message: string, code: ErrorCode): never {
+  throw new ParseError(line, message, code);
 }
 
 const NAME = /^[^()[\]{}:]+$/;
@@ -134,20 +168,20 @@ function parseItem(s: string): Item | null {
 /** `Command -> ... -> Event` or `... -> EventA, EventB` into {command, via, events}. */
 function parseChain(line: number, s: string): Chain {
   const raw = s.split('->').map((x) => x.trim());
-  if (raw.some((x) => x === '')) fail(line, 'empty item in chain');
-  const items = raw.map((x) => parseItem(x) ?? fail(line, `invalid item: ${x}`));
+  if (raw.some((x) => x === '')) fail(line, 'empty item in chain', 'empty-chain-item');
+  const items = raw.map((x) => parseItem(x) ?? fail(line, `invalid item: ${x}`, 'invalid-chain-item'));
   const [command, ...more] = items;
   const event = more.at(-1);
   const via = more.slice(0, -1);
-  if (command!.type !== 'name') fail(line, `expected a command, got ${raw[0]}`);
-  if (!event) fail(line, 'chain must end with an event');
-  if (event.type !== 'name') fail(line, `chain must end with an event, got ${raw.at(-1)}`);
+  if (command!.type !== 'name') fail(line, `expected a command, got ${raw[0]}`, 'expected-command');
+  if (!event) fail(line, 'chain must end with an event', 'chain-without-event');
+  if (event.type !== 'name') fail(line, `chain must end with an event, got ${raw.at(-1)}`, 'chain-without-event');
   const bad = via.find((v) => v.type === 'name');
-  if (bad) fail(line, `expected (Aggregate) or [External], got ${bad.name}`);
+  if (bad) fail(line, `expected (Aggregate) or [External], got ${bad.name}`, 'expected-aggregate-or-external');
   const events = event.name.split(',').map((e) => e.trim());
-  if (events.includes('')) fail(line, 'empty event name in chain');
+  if (events.includes('')) fail(line, 'empty event name in chain', 'empty-event-name');
   const twice = events.find((e, i) => events.indexOf(e) !== i);
-  if (twice !== undefined) fail(line, `chain names ${twice} twice`);
+  if (twice !== undefined) fail(line, `chain names ${twice} twice`, 'duplicate-event');
   return { command: command!.name, via: via as Via[], events };
 }
 
@@ -166,7 +200,7 @@ type Stmt = { line: number; level: number } & (
 
 function checkEventName(line: number, keyword: string, event: string): void {
   if (!NAME.test(event) || event.includes('->')) {
-    fail(line, `'${keyword}' expects an event name, got ${event}`);
+    fail(line, `'${keyword}' expects an event name, got ${event}`, 'expected-event-name');
   }
 }
 
@@ -175,27 +209,27 @@ function classify(n: number, raw: string): Stmt | null {
   const indent = raw.match(/^[ \t]*/)![0];
   const text = raw.trim();
   if (text === '' || text.startsWith('#')) return null;
-  if (indent.includes('\t')) fail(n, 'tab in indentation');
-  if (indent.length % 2 === 1) fail(n, 'indentation must be a multiple of 2 spaces');
+  if (indent.includes('\t')) fail(n, 'tab in indentation', 'tab-indent');
+  if (indent.length % 2 === 1) fail(n, 'indentation must be a multiple of 2 spaces', 'odd-indent');
 
   const base = { line: n, level: indent.length / 2 };
   let m: RegExpMatchArray | null;
 
   if (text.startsWith('!')) {
     const t = text.slice(1).trim();
-    if (t === '') fail(n, 'empty hotspot');
+    if (t === '') fail(n, 'empty hotspot', 'empty-hotspot');
     return { ...base, type: 'hotspot', text: t };
   }
   if (text.startsWith('*')) {
     const t = text.slice(1).trim();
-    if (t === '') fail(n, 'empty rule');
+    if (t === '') fail(n, 'empty rule', 'empty-rule');
     return { ...base, type: 'rule', text: t };
   }
   // Not a regex: /^==\s*(.*?)\s*==$/ backtracks cubically on long runs of spaces.
   if (text.length >= 4 && text.startsWith('==') && text.endsWith('==')) {
     const name = text.slice(2, -2).trim();
-    if (name === '') fail(n, 'empty section name');
-    if (base.level > 0) fail(n, 'section must not be indented');
+    if (name === '') fail(n, 'empty section name', 'empty-section');
+    if (base.level > 0) fail(n, 'section must not be indented', 'indented-top-level');
     return { ...base, type: 'section', name };
   }
   if ((m = text.match(/^\{([^{}]+)\}$/))) {
@@ -203,10 +237,10 @@ function classify(n: number, raw: string): Stmt | null {
   }
   if ((m = text.match(/^when\s+(.+)$/))) {
     const events = m[1]!.split(',').map((e) => e.trim());
-    if (events.includes('')) fail(n, "empty event name in 'when'");
+    if (events.includes('')) fail(n, "empty event name in 'when'", 'empty-event-name');
     for (const event of events) checkEventName(n, 'when', event);
     const twice = events.find((e, i) => events.indexOf(e) !== i);
-    if (twice !== undefined) fail(n, `'when' names ${twice} twice`);
+    if (twice !== undefined) fail(n, `'when' names ${twice} twice`, 'duplicate-event');
     return { ...base, type: 'when', events };
   }
   if ((m = text.match(/^after\s+(.+?)(?:\s+unless\s+(.+))?$/))) {
@@ -228,7 +262,7 @@ function classify(n: number, raw: string): Stmt | null {
   }
   if ((m = text.match(/^([^:]+):(.*)$/))) {
     const actor = m[1]!.trim();
-    if (!NAME.test(actor)) fail(n, `invalid actor: ${actor}`);
+    if (!NAME.test(actor)) fail(n, `invalid actor: ${actor}`, 'invalid-actor');
     return { ...base, type: 'flow', actor, ...parseChain(n, m[2]!) };
   }
   if (text.includes('->')) {
@@ -237,7 +271,7 @@ function classify(n: number, raw: string): Stmt | null {
   if (NAME.test(text)) {
     return { ...base, type: 'event', name: text };
   }
-  return fail(n, 'unrecognised line');
+  return fail(n, 'unrecognised line', 'unrecognised-line');
 }
 
 /** A step while collecting: a flow, when, after or reaction, flat. */
@@ -247,25 +281,25 @@ function checkLevel(steps: Flat[], { type, level, line }: Stmt): void {
   const prev = steps.at(-1)?.level;
   switch (type) {
     case 'flow':
-      if (level > 0) fail(line, 'flow must not be indented');
+      if (level > 0) fail(line, 'flow must not be indented', 'indented-top-level');
       break;
     case 'when':
-      if (level > 0) fail(line, "'when' must not be indented");
+      if (level > 0) fail(line, "'when' must not be indented", 'indented-top-level');
       break;
     case 'event':
-      if (level > 0) fail(line, 'event must not be indented');
+      if (level > 0) fail(line, 'event must not be indented', 'indented-top-level');
       break;
     case 'reaction':
     case 'after': {
       const keyword = type === 'after' ? 'after' : 'then';
-      if (level === 0 || prev === undefined) fail(line, `'${keyword}' has no parent flow`);
-      if (level > prev + 1) fail(line, `'${keyword}' must be one level deeper than its parent`);
+      if (level === 0 || prev === undefined) fail(line, `'${keyword}' has no parent flow`, 'no-parent');
+      if (level > prev + 1) fail(line, `'${keyword}' must be one level deeper than its parent`, 'indent-too-deep');
     }
   }
 }
 
 function dangling({ line, name }: { line: number; name: string }): ParseError {
-  return new ParseError(line, `read model {${name}} informs nothing`);
+  return new ParseError(line, `read model {${name}} informs nothing`, 'dangling-read-model');
 }
 
 interface Acc {
@@ -298,18 +332,18 @@ function collect(acc: Acc, stmt: Stmt): Acc {
       const step = acc.current === null ? undefined : acc.steps[acc.current]!;
       if (!step) acc.board.push(hotspot);
       else if (step.type === 'when' || step.type === 'after') {
-        fail(stmt.line, `hotspot must follow a flow or reaction, not '${step.type}'`);
+        fail(stmt.line, `hotspot must follow a flow or reaction, not '${step.type}'`, 'misplaced-hotspot');
       } else step.hotspots.push(hotspot);
       return acc;
     }
     case 'rule': {
       const step = acc.current === null ? undefined : acc.steps[acc.current]!;
       if (step?.type !== 'flow' && step?.type !== 'reaction') {
-        fail(stmt.line, 'rule must follow a flow or reaction');
+        fail(stmt.line, 'rule must follow a flow or reaction', 'misplaced-rule');
       }
       const aggregates = step.via.filter((v) => v.type === 'aggregate').length;
-      if (aggregates === 0) fail(stmt.line, 'rule needs an (Aggregate) in its step');
-      if (aggregates > 1) fail(stmt.line, 'rule is ambiguous: step has several aggregates');
+      if (aggregates === 0) fail(stmt.line, 'rule needs an (Aggregate) in its step', 'rule-without-aggregate');
+      if (aggregates > 1) fail(stmt.line, 'rule is ambiguous: step has several aggregates', 'ambiguous-rule');
       step.rules.push({ type: 'rule', text: stmt.text, line: stmt.line });
       return acc;
     }
@@ -395,7 +429,13 @@ function checkSeveral(trees: Node[]): ParseError[] {
     if ((s.type === 'flow' || s.type === 'reaction') && s.events.length > 1) {
       for (const r of s.reactions) {
         const keyword = r.type === 'after' ? 'after' : 'then';
-        errors.push(new ParseError(r.line, `'${keyword}' can't follow several events; use 'when' with one of them`));
+        errors.push(
+          new ParseError(
+            r.line,
+            `'${keyword}' can't follow several events; use 'when' with one of them`,
+            'reaction-after-several-events',
+          ),
+        );
       }
       s.reactions = [];
     }
@@ -413,7 +453,7 @@ function checkTriggers(trees: Node[], broken: string[]): ParseError[] {
   const maybe = new Set(broken.flatMap((raw) => raw.split(/->|[()[\]{}:]/).map((x) => x.trim())));
   const unknown = (line: number, keyword: string, event: string) => {
     if (!maybe.has(event)) {
-      errors.push(new ParseError(line, `'${keyword}' refers to unknown event ${event}`));
+      errors.push(new ParseError(line, `'${keyword}' refers to unknown event ${event}`, 'unknown-event'));
     }
   };
   const known = new Set<string>();
@@ -423,7 +463,7 @@ function checkTriggers(trees: Node[], broken: string[]): ParseError[] {
   }
   for (const s of allSteps(trees)) {
     if (s.type !== 'when' && s.type !== 'after') continue;
-    if (s.reactions.length === 0) errors.push(new ParseError(s.line, `'${s.type}' has no reactions`));
+    if (s.reactions.length === 0) errors.push(new ParseError(s.line, `'${s.type}' has no reactions`, 'no-reactions'));
     if (s.type === 'when') for (const e of s.events) if (!known.has(e)) unknown(s.line, 'when', e);
     if (s.type === 'after' && s.unless !== undefined && !known.has(s.unless)) unknown(s.line, 'unless', s.unless);
   }

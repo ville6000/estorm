@@ -320,63 +320,91 @@ cross sections. Hotspots and the other stickies are left out.
 ## Errors
 
 Reported as `<file>:<line>: <message>`, e.g.
-`board.estorm:4: 'then' has no parent flow`. Parsing stops at the first
-error. The messages:
+`board.estorm:4: 'then' has no parent flow`. `parse()` throws the first
+error; `parseAll()`, the command line, the language server and the browser
+editor report them all.
+
+Each error has a code, after it below, that stays the same across releases
+while messages may be reworded: match on the code, not the message.
+`estorm check` and `estorm lint` with `--format json` print an array of
+problems on stdout, each with a hint on how to fix it:
+
+```json
+[
+  {
+    "file": "board.estorm",
+    "line": 4,
+    "severity": "error",
+    "code": "no-parent",
+    "message": "'then' has no parent flow",
+    "hint": "Put `then` or `after` directly under the flow, event, reaction or `when` it reacts to, …"
+  }
+]
+```
+
+`severity` is `error` or `warning`. A file that can't be read has the code
+`unreadable` and no `line` or `hint`. A clean run prints `[]`.
 
 Lines
 
-- `unrecognised line`
-- `invalid actor: A(x)`
-- `empty hotspot`
-- `empty rule`
-- `empty section name`
+- `unrecognised line`: `unrecognised-line`
+- `invalid actor: A(x)`: `invalid-actor`
+- `empty hotspot`: `empty-hotspot`
+- `empty rule`: `empty-rule`
+- `empty section name`: `empty-section`
 
 Indentation
 
-- `tab in indentation`
-- `indentation must be a multiple of 2 spaces`
-- `flow must not be indented` (also for schedules)
-- `'when' must not be indented`
-- `event must not be indented`
-- `section must not be indented`
-- `'then' has no parent flow` (also `'after'`)
-- `'then' must be one level deeper than its parent` (also `'after'`)
+- `tab in indentation`: `tab-indent`
+- `indentation must be a multiple of 2 spaces`: `odd-indent`
+- `flow must not be indented` (also for schedules): `indented-top-level`
+- `'when' must not be indented`: `indented-top-level`
+- `event must not be indented`: `indented-top-level`
+- `section must not be indented`: `indented-top-level`
+- `'then' has no parent flow` (also `'after'`): `no-parent`
+- `'then' must be one level deeper than its parent` (also `'after'`):
+  `indent-too-deep`
 
 Chains
 
-- `chain must end with an event`
-- `chain must end with an event, got [CRM]`
-- `expected a command, got (Ticket)`
-- `expected (Aggregate) or [External], got TicketSubmitted`
-- `empty item in chain`
-- `empty event name in chain`
-- `chain names TicketClosed twice`
-- `invalid item: {Backlog}`
+- `chain must end with an event`: `chain-without-event`
+- `chain must end with an event, got [CRM]`: `chain-without-event`
+- `expected a command, got (Ticket)`: `expected-command`
+- `expected (Aggregate) or [External], got TicketSubmitted`:
+  `expected-aggregate-or-external`
+- `empty item in chain`: `empty-chain-item`
+- `empty event name in chain`: `empty-event-name`
+- `chain names TicketClosed twice`: `duplicate-event`
+- `invalid item: {Backlog}`: `invalid-chain-item`
 
 Structure
 
-- `read model {Backlog} informs nothing`
-- `rule must follow a flow or reaction`
-- `rule needs an (Aggregate) in its step`
-- `rule is ambiguous: step has several aggregates`
-- `hotspot must follow a flow or reaction, not 'when'` (also `'after'`)
-- `'then' can't follow several events; use 'when' with one of them` (also `'after'`)
-- `'when' has no reactions` (also `'after'`)
-- `'when' expects an event name, got (Ticket)` (also `'unless'`)
-- `'when' refers to unknown event TicketSubmited` (once per unknown event)
-- `empty event name in 'when'`
-- `'when' names TicketClosed twice`
-- `'unless' refers to unknown event CustomerFolowedUp`
+- `read model {Backlog} informs nothing`: `dangling-read-model`
+- `rule must follow a flow or reaction`: `misplaced-rule`
+- `rule needs an (Aggregate) in its step`: `rule-without-aggregate`
+- `rule is ambiguous: step has several aggregates`: `ambiguous-rule`
+- `hotspot must follow a flow or reaction, not 'when'` (also `'after'`):
+  `misplaced-hotspot`
+- `'then' can't follow several events; use 'when' with one of them` (also
+  `'after'`): `reaction-after-several-events`
+- `'when' has no reactions` (also `'after'`): `no-reactions`
+- `'when' expects an event name, got (Ticket)` (also `'unless'`):
+  `expected-event-name`
+- `'when' refers to unknown event TicketSubmited` (once per unknown event):
+  `unknown-event`
+- `empty event name in 'when'`: `empty-event-name`
+- `'when' names TicketClosed twice`: `duplicate-event`
+- `'unless' refers to unknown event CustomerFolowedUp`: `unknown-event`
 
 ## Warnings
 
 `estorm lint`, the language server and the browser editor also warn about
 boards that parse but model the domain poorly. Warnings never stop a board
-from rendering.
+from rendering. Their codes work like those of errors.
 
-- `event should be in the past tense: SubmitTicket`: no word of the event
-  name is a past participle. A heuristic: words ending in `-ed` and common
-  irregular ones (`Sent`, `Paid`, `Taken`) count.
-- `aggregate Ticket is used in several contexts: Support, Billing`: the same
-  aggregate appears in more than one section. Reported at its first use in
-  the second context.
+- `event should be in the past tense: SubmitTicket` (`past-tense`): no word
+  of the event name is a past participle. A heuristic: words ending in `-ed`
+  and common irregular ones (`Sent`, `Paid`, `Taken`) count.
+- `aggregate Ticket is used in several contexts: Support, Billing`
+  (`shared-aggregate`): the same aggregate appears in more than one section.
+  Reported at its first use in the second context.

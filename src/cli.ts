@@ -8,6 +8,7 @@ import { createServer } from 'node:http';
 import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { HINTS } from './hints.ts';
 import { lint, parse, parseAll, ParseError, render, renderTimeline, summarize } from './index.ts';
 import type { SvgOptions, Theme } from './index.ts';
 import { serveStdio } from './lsp.ts';
@@ -20,6 +21,7 @@ const USAGE = `Usage:
   estorm lint <file.estorm>...           errors and modelling warnings
   estorm summary <file.estorm>...        overview: actors, aggregates, gaps, hotspots
   estorm serve <file.estorm> [-p 8080]   live preview at http://localhost:8080
+  estorm guide                           how to write boards, for AI agents and newcomers
   estorm lsp                             language server over stdio, for editors
 
 Options:
@@ -28,6 +30,8 @@ Options:
   --theme <theme>     light (default for render), dark, or auto: follows the
                       viewer's colour scheme (default for serve)
   --no-legend         leave out the key to sticky colours and arrows
+  --format <format>   for check and lint: text (default), or json: an array of
+                      {file, line, severity, code, message, hint} on stdout
   -p, --port <port>   preview port (default 8080)
   -h, --help          show this help
   -v, --version       show the version`;
@@ -42,30 +46,77 @@ const READ_ERRORS: Record<string, string> = {
   EACCES: 'permission denied',
 };
 
-/** FILE's text, or why it can't be read. */
-function readText(file: string): { text: string } | { error: string } {
+/** FILE's text, or why it can't be read, such as "no such file". */
+function readText(file: string): { text: string } | { reason: string } {
   try {
     return { text: readFileSync(file, 'utf8') };
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
-    return { error: `${file}: ${READ_ERRORS[code ?? ''] ?? 'cannot read file'}` };
+    return { reason: READ_ERRORS[code ?? ''] ?? 'cannot read file' };
   }
+}
+
+/** A problem in a file, as `check` and `lint` report it. */
+interface Diagnostic {
+  file: string;
+  /** Absent when the file can't be read. */
+  line?: number;
+  severity: 'error' | 'warning';
+  /** An ErrorCode or WarningCode, or 'unreadable'. */
+  code: string;
+  message: string;
+  /** How to fix it. */
+  hint?: string;
+}
+
+/** "file:line: message", or "file: message" for the file as a whole. */
+function formatDiagnostic({ file, line, message }: Diagnostic): string {
+  return line === undefined ? `${file}: ${message}` : `${file}:${line}: ${message}`;
+}
+
+/** ERRORS, found in FILE, as diagnostics. */
+function parseErrors(file: string, errors: ParseError[]): Diagnostic[] {
+  return errors.map(({ line, code, message }): Diagnostic => ({
+    file,
+    line,
+    severity: 'error',
+    code,
+    message,
+    hint: HINTS[code],
+  }));
+}
+
+/**
+ * FILE's errors and, with WARNINGS, the lint warnings for what parsed, by
+ * line; an error on a line comes before a warning on it.
+ */
+function diagnose(file: string, warnings: boolean): Diagnostic[] {
+  const source = readText(file);
+  if ('reason' in source) return [{ file, severity: 'error', code: 'unreadable', message: source.reason }];
+  const { board, errors } = parseAll(source.text);
+  const advice = warnings
+    ? lint(board).map(({ line, code, message }): Diagnostic => ({
+        file,
+        line,
+        severity: 'warning',
+        code,
+        message,
+        hint: HINTS[code],
+      }))
+    : [];
+  return [...parseErrors(file, errors), ...advice].sort((a, b) => a.line! - b.line!);
 }
 
 /** FILE through CONVERT (SVG by default), or its errors as "file:line: message" lines. */
 function compile(file: string, convert: (text: string) => string = render): Result {
   const source = readText(file);
-  if ('error' in source) return source;
+  if ('reason' in source) return { error: `${file}: ${source.reason}` };
   const { text } = source;
   try {
     return { out: convert(text) };
   } catch (e) {
     if (e instanceof ParseError) {
-      return {
-        error: parseAll(text)
-          .errors.map((err) => `${file}:${err.line}: ${err.message}`)
-          .join('\n'),
-      };
+      return { error: parseErrors(file, parseAll(text).errors).map(formatDiagnostic).join('\n') };
     }
     throw e;
   }
@@ -103,30 +154,27 @@ function renderFiles(files: string[], out: string | undefined, timeline: boolean
   return failed ? 1 : 0;
 }
 
-function check(files: string[]): number {
-  if (files.length === 0) throw new UsageError('check needs at least one file');
-  const errors = files.map((f) => compile(f)).filter((r) => 'error' in r);
-  for (const r of errors) console.error(r.error);
-  return errors.length ? 1 : 0;
+type Format = 'text' | 'json';
+
+/**
+ * Reports the errors in FILES and, for lint, the warnings too: as text on
+ * stderr, or as one JSON array on stdout (`[]` when all is well).
+ */
+function report(command: 'check' | 'lint', files: string[], format: Format): number {
+  if (files.length === 0) throw new UsageError(`${command} needs at least one file`);
+  const found = files.flatMap((file) => diagnose(file, command === 'lint'));
+  if (format === 'json') process.stdout.write(`${JSON.stringify(found, null, 2)}\n`);
+  else process.stderr.write(found.map((d) => `${formatDiagnostic(d)}\n`).join(''));
+  return found.length ? 1 : 0;
 }
 
-function lintFiles(files: string[]): number {
-  if (files.length === 0) throw new UsageError('lint needs at least one file');
-  let failed = 0;
-  for (const file of files) {
-    // Errors and warnings by line, warnings only for what parsed.
-    const result = compile(file, (text) => {
-      const { board, errors } = parseAll(text);
-      return [...errors, ...lint(board)]
-        .sort((a, b) => a.line - b.line)
-        .map((w) => `${file}:${w.line}: ${w.message}\n`)
-        .join('');
-    });
-    const out = 'error' in result ? `${result.error}\n` : result.out;
-    if (out) failed++;
-    process.stderr.write(out);
-  }
-  return failed ? 1 : 0;
+// The guide `estorm guide` prints, at the package root: next to src/ while
+// developing and next to dist/ when installed.
+const GUIDE = new URL('../GUIDE.md', import.meta.url);
+
+function guide(): number {
+  process.stdout.write(readFileSync(GUIDE, 'utf8'));
+  return 0;
 }
 
 function summary(files: string[]): number {
@@ -162,7 +210,7 @@ function serve(files: string[], port: number, options: SvgOptions): Promise<numb
     const path = new URL(req.url ?? '/', 'http://localhost').pathname;
     if (path === '/') {
       const page = readText(fileURLToPath(PREVIEW_PAGE));
-      if ('error' in page) {
+      if ('reason' in page) {
         res
           .writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' })
           .end('Preview page not built: run npm run build');
@@ -171,8 +219,8 @@ function serve(files: string[], port: number, options: SvgOptions): Promise<numb
       }
     } else if (path === '/board') {
       const board = readText(file);
-      if ('error' in board) {
-        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end(board.error);
+      if ('reason' in board) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end(`${file}: ${board.reason}`);
       } else {
         const body = { name: basename(file), text: board.text, theme: options.theme, legend: options.legend };
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }).end(JSON.stringify(body));
@@ -207,6 +255,7 @@ async function main(argv: string[]): Promise<number> {
       theme: { type: 'string' },
       legend: { type: 'boolean', default: true },
       port: { type: 'string', short: 'p', default: '8080' },
+      format: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
       // Passed by some LSP clients; stdio is the only transport anyway.
@@ -222,6 +271,11 @@ async function main(argv: string[]): Promise<number> {
     return 0;
   }
   const [command, ...files] = positionals;
+  if (values.format !== undefined && command !== 'check' && command !== 'lint') {
+    throw new UsageError('--format works with check and lint only');
+  }
+  const format = values.format ?? 'text';
+  if (format !== 'text' && format !== 'json') throw new UsageError(`invalid format: ${format}`);
   switch (command) {
     case 'render':
       return renderFiles(files, values.out, values.timeline ?? false, {
@@ -229,9 +283,11 @@ async function main(argv: string[]): Promise<number> {
         legend: values.legend,
       });
     case 'check':
-      return check(files);
     case 'lint':
-      return lintFiles(files);
+      return report(command, files, format);
+    case 'guide':
+      if (files.length) throw new UsageError('guide takes no files');
+      return guide();
     case 'summary':
       return summary(files);
     case 'serve': {

@@ -1,0 +1,9 @@
+{
+  "name": "estorm",
+  "description": "Write, check and render Event Storming boards in estorm's plain-text notation, and transcribe photos of workshop walls into them.",
+  "author": { "name": "Ville Viklund" },
+  "homepage": "https://ville6000.github.io/estorm/",
+  "repository": "https://github.com/ville6000/estorm",
+  "license": "MIT",
+  "keywords": ["event-storming", "ddd", "domain-driven-design", "diagrams-as-code"]
+}

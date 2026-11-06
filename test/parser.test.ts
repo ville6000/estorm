@@ -397,6 +397,16 @@ describe('parseAll', () => {
     ]);
   });
 
+  it('gives each error a code', () => {
+    const text = lines('A: ->', 'Fine', 'when Nope', '  then C -> CDone', '\tB: Do -> Done', '(Order)');
+    expect(parseAll(text).errors.map((e) => e.code)).toEqual([
+      'empty-chain-item',
+      'unknown-event',
+      'tab-indent',
+      'unrecognised-line',
+    ]);
+  });
+
   it('keeps the lines that parse', () => {
     const { board } = parseAll(lines('A: ->', 'B: Do -> Done', '  then Oops', '  then C -> CDone'));
     expect(board).toMatchObject([{ type: 'flow', line: 2, reactions: [{ type: 'reaction', line: 4 }] }]);

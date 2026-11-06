@@ -1,0 +1,16 @@
+# estorm
+
+> Event Storming boards as plain text. A `.estorm` file describes a board in a few readable lines per flow, and the estorm command line (npm package `@villev/estorm`) renders it to SVG, checks it and lints it. Boards live in a repository next to the code.
+
+Before writing a board, read the guide: estorm's notation is its own. After writing one, run `npx @villev/estorm lint --format json <file>` and fix every error, using its hint, until none are left.
+
+## Docs
+
+- [Guide](https://ville6000.github.io/estorm/llms-full.txt): the notation, common mistakes, transcribing a photo of a workshop wall, and the full grammar, in one file
+- [Grammar](https://raw.githubusercontent.com/ville6000/estorm/main/GRAMMAR.md): every statement, error code and warning
+- [README](https://raw.githubusercontent.com/ville6000/estorm/main/README.md): the browser editor, command line, editor support, CI and library
+
+## Optional
+
+- [Browser editor](https://ville6000.github.io/estorm/): edit a board and see it rendered; nothing is uploaded
+- [Examples](https://github.com/ville6000/estorm/tree/main/examples): complete boards with their rendered SVGs
