@@ -157,9 +157,10 @@ but downloads the package and so needs a connection.
 ## Editor support
 
 For writing boards in your code editor: sticky colours, every parse error
-and lint warning as you type, highlights for the event under the cursor, and
+and lint warning as you type, highlights for the event under the cursor,
 completion of keywords and of the events, aggregates, externals and actors
-already on the board.
+already on the board, going from an event to the steps that produce it, and
+renaming any of those names everywhere at once.
 
 **VS Code:** install
 [estorm for VS Code](https://marketplace.visualstudio.com/items?itemName=villev.estorm)

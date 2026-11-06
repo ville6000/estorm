@@ -6,6 +6,12 @@ errors as you type, highlights every mention of the event under the
 cursor, and completes keywords and the events, aggregates, externals and
 actors already on the board.
 
+Go to definition jumps from an event, say in a `when` or `unless`, to the
+steps that produce it. Rename changes an event, aggregate, external or
+actor everywhere on the board, including in `when` and `unless`, but not in
+hotspots, rules or comments. It refuses a name that would break a line or
+change what it means, such as one with `->` or brackets.
+
 Token types are named after the stickies: `actor`, `command`, `aggregate`,
 `external`, `event`, `readModel`, `schedule`, `hotspot`, `rule` and `section`, plus
 the standard `comment`, `keyword` and `operator`. Most themes colour only
@@ -53,6 +59,8 @@ end
 These colours suit a light background. To follow your colorscheme instead,
 link each type to one of its groups, such as `{ link = 'Constant' }`, and
 set them again on `ColorScheme`, which clears them.
+
+Neovim maps rename to `grn`, and `Ctrl-]` goes to the definition.
 
 Neovim doesn't ask for event highlights on its own. To highlight every
 mention of the event when the cursor rests on one:

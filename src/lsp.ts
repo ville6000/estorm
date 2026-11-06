@@ -7,6 +7,8 @@
  *   document highlight  every mention of the event under the cursor
  *   completion          keywords, and events, aggregates, externals and actors
  *                       already on the board
+ *   definition          from an event to the steps that produce it
+ *   rename              an event, aggregate, external or actor, everywhere
  *
  * Only the small part of the protocol these need is implemented, so the
  * server has no dependencies. Documents are synced in full on each change.
@@ -108,26 +110,136 @@ export function diagnostics(text: string) {
   ];
 }
 
+/** The kinds of name a board repeats, and so can rename or look up. */
+type NameKind = 'event' | 'aggregate' | 'external' | 'actor';
+
+/** One mention of a name: an aggregate's or external's without its brackets. */
+interface Mention {
+  kind: NameKind;
+  name: string;
+  line: number;
+  from: number;
+  to: number;
+  /** Whether the step on this line produces the event, rather than a `when` or `unless` naming it. */
+  produces: boolean;
+}
+
+const BRACKETED = { aggregate: /^\([^()[\]]+\)$/, external: /^\[[^()[\]]+\]$/ };
+
+/** The names mentioned on LINE, line number N, in order. */
+function mentionsIn(line: string, n: number): Mention[] {
+  const tokens = tokenize(line);
+  const keyword = (t: Token | undefined, word: string) => t?.kind === 'keyword' && line.slice(t.from, t.to) === word;
+  return tokens.flatMap((t, i): Mention[] => {
+    let { from, to } = t;
+    if (t.kind === 'aggregate' || t.kind === 'external') {
+      if (!BRACKETED[t.kind].test(line.slice(from, to))) return [];
+      from++;
+      to--;
+      while (line[from] === ' ') from++;
+      while (line[to - 1] === ' ') to--;
+      if (from >= to) return [];
+    } else if (t.kind !== 'event' && t.kind !== 'actor') {
+      return [];
+    }
+    const named = t.kind === 'event' && (keyword(tokens[0], 'when') || keyword(tokens[i - 1], 'unless'));
+    return [{ kind: t.kind, name: line.slice(from, to), line: n, from, to, produces: !named }];
+  });
+}
+
+const allMentions = (all: string[]) => all.flatMap(mentionsIn);
+
+const mentionAt = (all: string[], pos: Position) =>
+  mentionsIn(all[pos.line] ?? '', pos.line).find((m) => m.from <= pos.character && pos.character <= m.to);
+
+const sameName = (a: Mention) => (b: Mention) => a.kind === b.kind && a.name === b.name;
+
+const rangeOf = (m: Mention) => ({
+  start: { line: m.line, character: m.from },
+  end: { line: m.line, character: m.to },
+});
+
 /** Every mention of the event under POS, or [] when it isn't on one. */
 export function eventHighlights(text: string, pos: Position) {
   const all = lines(text);
-  const name = (line: string, t: Token) => line.slice(t.from, t.to);
-  const line = all[pos.line] ?? '';
-  const at = tokenize(line).find((t) => t.kind === 'event' && t.from <= pos.character && pos.character <= t.to);
-  if (!at) return [];
-  const current = name(line, at);
-  return all.flatMap((line, n) =>
-    tokenize(line)
-      .filter((t) => t.kind === 'event' && name(line, t) === current)
-      .map((t) => ({ range: { start: { line: n, character: t.from }, end: { line: n, character: t.to } } })),
-  );
+  const at = mentionAt(all, pos);
+  if (at?.kind !== 'event') return [];
+  return allMentions(all)
+    .filter(sameName(at))
+    .map((m) => ({ range: rangeOf(m) }));
+}
+
+/**
+ * Where the event under POS is produced: the end of each chain that has it,
+ * and each line that has it on its own. [] when POS isn't on an event, or
+ * nothing produces it.
+ */
+export function eventDefinitions(text: string, pos: Position) {
+  const all = lines(text);
+  const at = mentionAt(all, pos);
+  if (at?.kind !== 'event') return [];
+  return allMentions(all)
+    .filter((m) => m.produces && sameName(at)(m))
+    .map(rangeOf);
+}
+
+/** A request that can't be carried out, with a message for the user. */
+export class RequestFailed extends Error {}
+
+/** The name under POS to rename, as LSP's prepareRename result, or null when POS isn't on one. */
+export function prepareRename(text: string, pos: Position) {
+  const at = mentionAt(lines(text), pos);
+  return at ? { range: rangeOf(at), placeholder: at.name } : null;
+}
+
+/**
+ * Text edits that rename the event, aggregate, external or actor under POS
+ * to NEWNAME, everywhere it is mentioned; null when POS isn't on one.
+ * Aggregates and externals keep their brackets, and an aggregate is renamed
+ * apart from an external of the same name. Throws RequestFailed when
+ * NEWNAME isn't a valid name there, or would break or change a line.
+ */
+export function rename(text: string, pos: Position, newName: string) {
+  const all = lines(text);
+  const at = mentionAt(all, pos);
+  if (!at) return null;
+  const name = newName.trim();
+  if (!name) throw new RequestFailed('A name cannot be empty');
+  if (/->|[()[\]{}:\r\n]/.test(name)) throw new RequestFailed('A name cannot contain ->, brackets, braces or a colon');
+
+  const renamed = allMentions(all).filter(sameName(at));
+  /** What LINE says, as its token kinds and its names, the ones being renamed read as NAMED. */
+  const shape = (line: string, named: (m: Mention) => string) =>
+    JSON.stringify([tokenize(line).map((t) => t.kind), mentionsIn(line, 0).map((m) => [m.kind, named(m)])]);
+  const after = [...all];
+  for (const n of new Set(renamed.map((m) => m.line))) {
+    const before = all[n]!;
+    let line = '';
+    let end = 0;
+    for (const m of renamed.filter((m) => m.line === n)) {
+      line += before.slice(end, m.from) + name;
+      end = m.to;
+    }
+    after[n] = line += before.slice(end);
+    // Only the name may change: one like `# Note` turns an event's line into a comment, `A, B` into two events.
+    if (shape(line, (m) => m.name) !== shape(before, (m) => (sameName(at)(m) ? name : m.name)))
+      throw new RequestFailed(`Renaming to ${name} would change what line ${n + 1} means`);
+  }
+
+  const known = parseAll(all.join('\n')).errors.map((e) => `${e.line}:${e.code}`);
+  for (const e of parseAll(after.join('\n')).errors) {
+    const i = known.indexOf(`${e.line}:${e.code}`);
+    if (i === -1) throw new RequestFailed(`Renaming to ${name} would break line ${e.line}: ${e.message}`);
+    known.splice(i, 1);
+  }
+
+  return renamed.map((m) => ({ range: rangeOf(m), newText: name }));
 }
 
 const KEYWORDS = ['when', 'then', 'after', 'every'];
 
 /** LSP CompletionItemKind for each kind of name offered. */
-const ITEM_KIND = { keyword: 14, event: 23, aggregate: 7, external: 9, actor: 6 };
-type NameKind = Exclude<keyof typeof ITEM_KIND, 'keyword'>;
+const ITEM_KIND: Record<NameKind | 'keyword', number> = { keyword: 14, event: 23, aggregate: 7, external: 9, actor: 6 };
 
 /**
  * Completions at POS: events after `when`, `unless` or an arrow, aggregates
@@ -207,13 +319,18 @@ export function createServer(send: (msg: object) => void, exit: (code: number) =
       params: { uri, diagnostics: diagnostics(text) },
     });
 
+  const textOf = (p: any) => docs.get(p.textDocument.uri) ?? '';
+
   const requests: Record<string, (params: any) => unknown> = {
-    initialize: () => ({
+    initialize: (p) => ({
       capabilities: {
         textDocumentSync: { openClose: true, change: 1 },
         semanticTokensProvider: { legend: { tokenTypes: TOKEN_TYPES, tokenModifiers: [] }, full: true },
         documentHighlightProvider: true,
         completionProvider: { triggerCharacters: [' ', '(', '['] },
+        definitionProvider: true,
+        // Servers may only offer prepareRename to clients that say they support it.
+        renameProvider: p?.capabilities?.textDocument?.rename?.prepareSupport ? { prepareProvider: true } : true,
       },
       serverInfo: { name: 'estorm' },
     }),
@@ -221,9 +338,16 @@ export function createServer(send: (msg: object) => void, exit: (code: number) =
       shutdown = true;
       return null;
     },
-    'textDocument/semanticTokens/full': (p) => ({ data: semanticTokens(docs.get(p.textDocument.uri) ?? '') }),
-    'textDocument/documentHighlight': (p) => eventHighlights(docs.get(p.textDocument.uri) ?? '', p.position),
-    'textDocument/completion': (p) => completions(docs.get(p.textDocument.uri) ?? '', p.position),
+    'textDocument/semanticTokens/full': (p) => ({ data: semanticTokens(textOf(p)) }),
+    'textDocument/documentHighlight': (p) => eventHighlights(textOf(p), p.position),
+    'textDocument/completion': (p) => completions(textOf(p), p.position),
+    'textDocument/definition': (p) =>
+      eventDefinitions(textOf(p), p.position).map((range) => ({ uri: p.textDocument.uri, range })),
+    'textDocument/prepareRename': (p) => prepareRename(textOf(p), p.position),
+    'textDocument/rename': (p) => {
+      const edits = rename(textOf(p), p.position, p.newName);
+      return edits && { changes: { [p.textDocument.uri]: edits } };
+    },
   };
 
   const notifications: Record<string, (params: any) => void> = {
@@ -258,7 +382,9 @@ export function createServer(send: (msg: object) => void, exit: (code: number) =
     try {
       send({ jsonrpc: '2.0', id, result: handler(msg.params) });
     } catch (e) {
-      send({ jsonrpc: '2.0', id, error: { code: -32603, message: e instanceof Error ? e.message : String(e) } });
+      // RequestFailed (-32803) tells the client the message is for the user; anything else is a bug (-32603).
+      const code = e instanceof RequestFailed ? -32803 : -32603;
+      send({ jsonrpc: '2.0', id, error: { code, message: e instanceof Error ? e.message : String(e) } });
     }
   };
 }
