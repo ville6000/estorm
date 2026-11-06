@@ -1,5 +1,9 @@
+import { CompletionContext, type Completion } from '@codemirror/autocomplete';
+import { EditorState } from '@codemirror/state';
+import type { EditorView } from '@codemirror/view';
 import { describe, expect, it } from 'vitest';
 import { ParseError } from '../src/index.ts';
+import { suggest } from '../web/complete.ts';
 import { errorsHtml, escape, summaryHtml, warningsHtml } from '../web/html.ts';
 import { editorShare, MIN_PANE } from '../web/split.ts';
 import {
@@ -96,5 +100,63 @@ describe('split', () => {
   it('leaves both panes at least MIN_PANE', () => {
     expect(editorShare(10, 1000)).toBe(MIN_PANE / 1000);
     expect(editorShare(990, 1000)).toBe((1000 - MIN_PANE) / 1000);
+  });
+});
+
+describe('complete', () => {
+  const board = 'Customer: Place order -> (Order) -> Order placed\n  then Charge -> [Stripe] -> Card charged\n';
+  /** The suggestions with the cursor at | in LINE, appended to the board. */
+  const at = (line: string) => {
+    const pos = board.length + line.indexOf('|');
+    const state = EditorState.create({ doc: board + line.replace('|', ''), selection: { anchor: pos } });
+    return { state, result: suggest(new CompletionContext(state, pos, false)) };
+  };
+  /** The line after accepting OPTION, the cursor marked with |. */
+  const accept = (state: EditorState, option: Completion, from: number) => {
+    const view = { state, dispatch: (spec: object) => (view.state = view.state.update(spec).state) };
+    (option.apply as (v: EditorView, c: Completion, from: number, to: number) => void)(
+      view as unknown as EditorView,
+      option,
+      from,
+      state.selection.main.head,
+    );
+    const { doc, selection } = view.state;
+    const text = doc.toString();
+    const head = selection.main.head;
+    return (text.slice(0, head) + '|' + text.slice(head)).slice(board.length);
+  };
+
+  it('suggests the names on the board, replacing the whole name typed', () => {
+    const { state, result } = at('when Order p|');
+    expect(result!.from).toBe(board.length + 5);
+    expect(result!.options.map((o) => [o.label, o.detail])).toEqual([
+      ['Order placed', 'event'],
+      ['Card charged', 'event'],
+    ]);
+    expect(accept(state, result!.options[0]!, result!.from)).toBe('when Order placed|');
+  });
+
+  it('suggests aggregates in their brackets, over a closing bracket after the cursor', () => {
+    const { state, result } = at('A: Do -> (O|)');
+    expect(result!.options.map((o) => o.label)).toEqual(['(Order)']);
+    expect(accept(state, result!.options[0]!, result!.from)).toBe('A: Do -> (Order)|');
+  });
+
+  it('suggests keywords, actors and events at the start of a line', () => {
+    expect(at('  w|').result!.options.map((o) => o.label)).toEqual([
+      'when ',
+      'then ',
+      'after ',
+      'every ',
+      'Customer: ',
+      'Order placed',
+      'Card charged',
+    ]);
+  });
+
+  it('suggests nothing where there is nothing to complete, or a name typed in full', () => {
+    expect(at('  then |').result).toBeNull();
+    expect(at('# Or|').result).toBeNull();
+    expect(at('when Card charged|').result).toBeNull();
   });
 });

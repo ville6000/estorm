@@ -1,7 +1,9 @@
 /**
  * The source editor: CodeMirror with estorm highlighting, parse errors marked
- * in the gutter, two-space indentation and optional vim keys.
+ * in the gutter, two-space indentation, autocompletion (complete.ts) and
+ * optional vim keys.
  */
+import { acceptCompletion } from '@codemirror/autocomplete';
 import { Compartment, EditorState, RangeSet, RangeSetBuilder, StateEffect, StateField } from '@codemirror/state';
 import {
   Decoration,
@@ -18,6 +20,7 @@ import {
 import { defaultKeymap, history, historyKeymap, insertNewlineKeepIndent } from '@codemirror/commands';
 import { vim } from '@replit/codemirror-vim';
 import { tokenize } from '../src/highlight.ts';
+import { autocomplete } from './complete.ts';
 
 export { Vim } from '@replit/codemirror-vim';
 
@@ -100,11 +103,15 @@ export function createState(text: string, { vim, onChange }: { vim: boolean; onC
       highlighter,
       history(),
       drawSelection(),
+      autocomplete,
       EditorState.tabSize.of(2),
       keymap.of([
+        // Accept a suggestion, as Enter does; otherwise indent.
         {
           key: 'Tab',
-          run: (v) => (v.dispatch(v.state.replaceSelection('  '), { scrollIntoView: true, userEvent: 'input' }), true),
+          run: (v) =>
+            acceptCompletion(v) ||
+            (v.dispatch(v.state.replaceSelection('  '), { scrollIntoView: true, userEvent: 'input' }), true),
         },
         // Keep the indentation of the current line.
         { key: 'Enter', run: insertNewlineKeepIndent },

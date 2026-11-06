@@ -80,6 +80,10 @@ sticky to jump to its line, open and save `.estorm` files, export SVG,
 switch to the [timeline view](GRAMMAR.md#timeline-view) and open a summary of lint warnings, actors, aggregates, context
 dependencies, gaps and hotspots.
 
+As you type, the editor suggests keywords and the events, aggregates,
+externals and actors already on the board; Enter or Tab accepts, Esc closes
+the list and Ctrl+Space (⌥I on a Mac) opens it.
+
 A legend above the board names the sticky colours and arrow styles it uses,
 so exported images make sense to people who don't know the notation.
 
