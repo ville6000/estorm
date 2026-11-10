@@ -1,0 +1,18 @@
+<!doctype html>
+<!--
+  The preview page editors embed, outside any editor, for working on the
+  page itself: `npm run dev`, then open /embed/. dev.ts plays the editor: it
+  renders the text box with estorm and logs what the page sends back.
+  `vite build --mode embed` builds main.ts alone, the page editors ship.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>estorm preview</title>
+  </head>
+  <body>
+    <script type="module" src="./dev.ts"></script>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

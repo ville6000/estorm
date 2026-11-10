@@ -30,8 +30,10 @@ estorm is a small pipeline. Each step is a pure function in its own file:
 | `src/index.ts`     | public API: `parse`, `parseAll`, `layout`, `svg`, `render`, `summarize`, `lint`                      |
 | `src/highlight.ts` | one line to tokens, for the editor and the language server                                           |
 | `src/lsp.ts`       | `estorm lsp`: language server over stdio                                                             |
+| `src/embed.ts`     | the messages between the editors' preview page, `web/embed/`, and the editor                         |
 | `src/cli.ts`       | `estorm render / check / lint / summary / serve / guide / lsp`                                       |
 | `web/`             | the browser editor, built into one file, `estorm.html`, and the `serve` page, `preview.html`         |
+| `web/embed/`       | the preview page the VS Code and JetBrains plugins show, built to `dist/embed/` (EDITORS.md)         |
 | `examples/`        | example boards and their rendered SVGs                                                               |
 | `GUIDE.md`         | the guide `estorm guide` prints, for AI agents; its examples are tested                              |
 | `plugins/estorm/`  | the Claude Code plugin and its skill, listed by `.claude-plugin/marketplace.json`                    |

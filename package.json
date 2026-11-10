@@ -29,7 +29,12 @@
     "./lsp": {
       "types": "./dist/lsp.d.ts",
       "default": "./dist/lsp.js"
-    }
+    },
+    "./embed": {
+      "types": "./dist/embed.d.ts",
+      "default": "./dist/embed.js"
+    },
+    "./embed/*": "./dist/embed/*"
   },
   "publishConfig": {
     "access": "public"
@@ -46,7 +51,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -p tsconfig.build.json && vite build && vite build --mode preview",
+    "build": "tsc -p tsconfig.build.json && vite build && vite build --mode preview && vite build --mode embed",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
