@@ -175,9 +175,9 @@ from the Marketplace. It bundles the language server and adds a live
 preview of the board; nothing else to install.
 
 **IntelliJ IDEA, WebStorm, Rider and the other JetBrains IDEs:** install
-[estorm for JetBrains IDEs](https://github.com/ville6000/estorm-jetbrains).
-It also bundles the language server, which needs Node.js 20 or later, and
-adds a live preview of the board.
+[estorm for JetBrains IDEs](https://plugins.jetbrains.com/plugin/35971-estorm)
+from JetBrains Marketplace. It also bundles the language server, which
+needs Node.js 20 or later, and adds a live preview of the board.
 
 **Other editors:** install the [command line](#command-line); it includes the
 language server, `estorm lsp`, for any editor that speaks LSP. Setup for

@@ -35,12 +35,13 @@ and settings.
 
 ## JetBrains IDEs
 
-[estorm for JetBrains IDEs](https://github.com/ville6000/estorm-jetbrains)
-works in IntelliJ IDEA, WebStorm, Rider, PyCharm and the other JetBrains
-IDEs from 2026.2, but not in Android Studio. It colours the text itself and
-adds a live preview of the board. Errors, highlights, completion, go to
-definition and rename come from the server it bundles, which runs on
-Node.js 20 or later. Its
+Install [estorm for JetBrains IDEs](https://plugins.jetbrains.com/plugin/35971-estorm)
+from JetBrains Marketplace: **Settings | Plugins | Marketplace**, search for
+estorm. It works in IntelliJ IDEA, WebStorm, Rider, PyCharm and the other
+JetBrains IDEs from 2026.2, but not in Android Studio. It colours the text
+itself and adds a live preview of the board. Errors, highlights,
+completion, go to definition and rename come from the server it bundles,
+which runs on Node.js 20 or later. Its
 [README](https://github.com/ville6000/estorm-jetbrains#readme) covers
 colours and settings.
 
